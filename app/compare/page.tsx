@@ -60,17 +60,16 @@ function LeaderCard({
   teams: TeamSnapshot[];
 }) {
   return (
-    <article className="rounded-[12px] border border-white/10 bg-[#101010] p-4">
-      <div className="text-[11px] uppercase tracking-[0.14em] text-white/36">{label}</div>
-      <div className="mt-3 text-3xl font-medium tracking-[-0.05em] text-white">
+    <article className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
+      <div className="text-[10px] uppercase tracking-[0.12em] text-white/36">{label}</div>
+      <div className="mt-1.5 text-xl font-medium tracking-[-0.04em] text-white">
         {formatValue(value)}
       </div>
-      <div className="mt-3 space-y-1 text-sm text-white/68">
+      <div className="mt-1.5 space-y-0.5 text-xs text-white/60">
         {teams.length > 0 ? (
           teams.map((team) => (
             <div key={`${label}-${team.teamNumber}`}>
-              {team.teamNumber}
-              {team.name ? ` / ${team.name}` : ""}
+              {team.teamNumber}{team.name ? ` · ${team.name}` : ""}
             </div>
           ))
         ) : (
@@ -166,22 +165,22 @@ function SnapshotMetric({
   return (
     <div
       className={[
-        "rounded-[10px] border p-3",
+        "rounded-[8px] border px-3 py-2.5",
         highlighted ? "border-white/20 bg-[#151515]" : "border-white/10 bg-[#111111]",
       ].join(" ")}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">{label}</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[10px] uppercase tracking-[0.1em] text-white/36">{label}</div>
         {highlighted ? (
-          <div className="rounded-[8px] border border-white/10 bg-[#0a0a0a] px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-white/72">
+          <span className="rounded-[5px] border border-white/10 bg-[#0a0a0a] px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-white/60">
             Best
-          </div>
+          </span>
         ) : null}
       </div>
-      <div className="mt-3 text-2xl font-medium tracking-[-0.04em] text-white">
+      <div className="mt-1.5 text-lg font-medium tracking-[-0.03em] text-white">
         {formatValue(value)}
       </div>
-      <div className="mt-2 text-sm text-white/52">{rankText}</div>
+      <div className="mt-0.5 text-xs text-white/44">{rankText}</div>
     </div>
   );
 }
@@ -196,48 +195,33 @@ function TeamCard({
   season: number;
 }) {
   return (
-    <article className="rounded-[14px] border border-white/10 bg-[#090909] p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <article className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-3xl font-medium tracking-[-0.06em] text-white">
+          <div className="text-xl font-medium tracking-[-0.04em] text-white">
             {team.teamNumber}
-            {team.name ? ` - ${team.name}` : ""}
+            {team.name ? ` · ${team.name}` : ""}
           </div>
           {team.organization ? (
-            <div className="mt-2 text-base text-white/76">{team.organization}</div>
+            <div className="mt-0.5 text-sm text-white/58">{team.organization}</div>
           ) : null}
         </div>
-
         <Link
           href={`/teams?q=${team.teamNumber}&season=${season}`}
-          className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-white/72"
+          className="shrink-0 text-[10px] uppercase tracking-[0.14em] text-white/36 hover:text-white/60"
         >
-          Open team
+          Team page →
         </Link>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Location</div>
-          <div className="mt-2 text-base text-white/84">{team.location ?? "Unavailable"}</div>
-        </div>
-        <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Season Events</div>
-          <div className="mt-2 text-base text-white/84">{team.eventCount}</div>
-        </div>
-        <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Rookie Year</div>
-          <div className="mt-2 text-base text-white/84">
-            {team.rookieYear ? String(team.rookieYear) : "Unavailable"}
-          </div>
-        </div>
-        <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Strength</div>
-          <div className="mt-2 text-base text-white/84">{formatValue(team.strength)}</div>
-        </div>
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/50">
+        {team.location ? <span>{team.location}</span> : null}
+        {team.rookieYear ? <span>Since {team.rookieYear}</span> : null}
+        <span>{team.eventCount} events</span>
+        <span>Strength {formatValue(team.strength)}</span>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {METRICS.map((metric) => (
           <SnapshotMetric
             key={`${team.teamNumber}-${metric.key}`}
@@ -290,16 +274,9 @@ export default async function ComparePage(props: PageProps<"/compare">) {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
-      <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
-        <section className="rounded-[14px] border border-white/10 bg-[#090909] p-6">
-          <div className="text-[11px] uppercase tracking-[0.22em] text-white/34">Compare</div>
-          <h1 className="mt-3 text-4xl font-medium tracking-[-0.08em] text-white sm:text-5xl">
-            compare teams
-          </h1>
-          <p className="mt-3 max-w-3xl text-base text-white/58 sm:text-lg">
-            Compare current season quick stats, event counts, and published team profile info side by side.
-          </p>
-
+      <div className="mx-auto max-w-6xl px-5 py-4 sm:px-8 sm:py-6">
+        <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
+          <h1 className="text-2xl font-medium tracking-[-0.05em] text-white sm:text-3xl">Compare Teams</h1>
           <CompareBuilderForm
             key={`compare-form:${season}:${teamNumbers.join("-")}`}
             initialTeams={teamNumbers}
@@ -309,55 +286,42 @@ export default async function ComparePage(props: PageProps<"/compare">) {
         </section>
 
         {!hasQuery ? (
-          <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-white/52">
+          <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-white/52">
             Enter at least two FTC team numbers to compare their season snapshot.
           </section>
         ) : teamNumbers.length < 2 ? (
-          <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-[#ff9c9c]">
+          <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#ff9c9c]">
             Enter at least two valid FTC team numbers.
           </section>
         ) : (
           <>
-            <section className="mt-6 grid gap-4 md:grid-cols-3">
-              <article className="rounded-[12px] border border-white/10 bg-[#090909] p-5">
-                <div className="text-[11px] uppercase tracking-[0.14em] text-white/36">Compared Teams</div>
-                <div className="mt-3 text-4xl font-medium tracking-[-0.06em] text-white">
-                  {snapshots.length}
-                </div>
+            <section className="mt-4 grid grid-cols-3 gap-3">
+              <article className="rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-white/36">Teams</div>
+                <div className="mt-1.5 text-2xl font-medium tracking-[-0.04em] text-white">{snapshots.length}</div>
               </article>
-              <article className="rounded-[12px] border border-white/10 bg-[#090909] p-5">
-                <div className="text-[11px] uppercase tracking-[0.14em] text-white/36">Season</div>
-                <div className="mt-3 text-4xl font-medium tracking-[-0.06em] text-white">
-                  {season}
-                </div>
+              <article className="rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-white/36">Season</div>
+                <div className="mt-1.5 text-2xl font-medium tracking-[-0.04em] text-white">{season}</div>
               </article>
-              <article className="rounded-[12px] border border-white/10 bg-[#090909] p-5">
-                <div className="text-[11px] uppercase tracking-[0.14em] text-white/36">Combined Events</div>
-                <div className="mt-3 text-4xl font-medium tracking-[-0.06em] text-white">
-                  {totalEvents}
-                </div>
+              <article className="rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-white/36">Combined Events</div>
+                <div className="mt-1.5 text-2xl font-medium tracking-[-0.04em] text-white">{totalEvents}</div>
               </article>
             </section>
 
-            <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-5 sm:p-6">
-              <div className="text-2xl font-medium tracking-[-0.04em] text-white">Leaders</div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-4">
+              <div className="text-base font-medium text-white mb-3">Leaders</div>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {leaderCards.map((card) => (
                   <LeaderCard key={card.label} label={card.label} value={card.value} teams={card.teams} />
                 ))}
               </div>
             </section>
 
-            <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-5 sm:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-2xl font-medium tracking-[-0.04em] text-white">
-                  Metric Graphs
-                </div>
-                <div className="text-sm text-white/46">
-                  Current season values across the comparison set
-                </div>
-              </div>
-              <div className="mt-4 grid gap-4 2xl:grid-cols-2">
+            <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-4">
+              <div className="text-base font-medium text-white mb-3">Metric Graphs</div>
+              <div className="grid gap-3 2xl:grid-cols-2">
                 {METRICS.map((metric) => (
                   <MetricBarChart
                     key={`chart-${metric.key}`}
@@ -369,7 +333,7 @@ export default async function ComparePage(props: PageProps<"/compare">) {
               </div>
             </section>
 
-            <section className="mt-6 grid gap-4 2xl:grid-cols-2">
+            <section className="mt-4 grid gap-3 2xl:grid-cols-2">
               {snapshots.map((team) => (
                 <TeamCard key={`compare-${team.teamNumber}`} team={team} leaders={leaders} season={season} />
               ))}

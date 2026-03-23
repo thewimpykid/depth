@@ -228,58 +228,39 @@ function StandingCard({
   );
 }
 
-function MatchCard({ match, isRandom }: { match: ActualEventMatch; isRandom: boolean }) {
+function MatchRow({ match, isRandom }: { match: ActualEventMatch; isRandom: boolean }) {
   const played = !isRandom && match.status === "played";
+  const hasActual = played && match.actualRedScore !== null && match.actualBlueScore !== null;
   return (
-    <article className="rounded-[10px] border border-white/10 bg-[#0c0c0c] px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="text-sm font-medium text-white">{match.label}</span>
-          <span className="text-[10px] uppercase tracking-[0.12em] text-white/32">
-            {isRandom ? "sample" : played ? "played" : "upcoming"}
-          </span>
-        </div>
-        {played && match.actualRedScore !== null && match.actualBlueScore !== null ? (
-          <span className="text-xs tabular-nums text-white/50">
-            <span className="text-[#f0b9b9]">{match.actualRedScore}</span>
-            <span className="text-white/24 mx-1">–</span>
-            <span className="text-[#bdd5ff]">{match.actualBlueScore}</span>
-          </span>
-        ) : null}
-      </div>
+    <div className="flex items-center gap-2 rounded-[8px] border border-white/8 bg-[#0d0d0d] px-3 py-2 text-xs">
+      <span className="w-28 shrink-0 truncate font-medium text-white/50">{match.label}</span>
 
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        {(["red", "blue"] as const).map((tone) => {
-          const teams = tone === "red" ? match.redAlliance : match.blueAlliance;
-          const prob = tone === "red" ? match.redWinProbability : match.blueWinProbability;
-          const proj = tone === "red" ? match.predictedRedScore : match.predictedBlueScore;
-          return (
-            <div
-              key={tone}
-              className={[
-                "rounded-[8px] border px-3 py-2.5",
-                tone === "red" ? "border-[#552222]/60 bg-[#140a0a]" : "border-[#1e3a5f]/60 bg-[#0a1018]",
-              ].join(" ")}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className={["text-[10px] uppercase tracking-[0.1em]", tone === "red" ? "text-[#f0b9b9]/70" : "text-[#bdd5ff]/70"].join(" ")}>
-                  {tone === "red" ? "Red" : "Blue"}
-                </span>
-                <span className="text-[10px] tabular-nums text-white/46">{formatProbability(prob)}</span>
-              </div>
-              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
-                {teams.map((t) => (
-                  <span key={t.teamNumber} className="text-xs text-white/72">{t.teamNumber}</span>
-                ))}
-              </div>
-              <div className="mt-1.5 text-xs text-white/38">
-                Proj {formatValue(proj)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </article>
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500/50" />
+      <span className="min-w-0 flex-1 truncate tabular-nums text-white/72">
+        {match.redAlliance.map((t) => t.teamNumber).join(" · ")}
+      </span>
+      <span className="shrink-0 tabular-nums text-white/34">{match.redWinProbability.toFixed(0)}%</span>
+
+      <span className="shrink-0 text-white/18">vs</span>
+
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400/50" />
+      <span className="min-w-0 flex-1 truncate tabular-nums text-white/72">
+        {match.blueAlliance.map((t) => t.teamNumber).join(" · ")}
+      </span>
+      <span className="shrink-0 tabular-nums text-white/34">{match.blueWinProbability.toFixed(0)}%</span>
+
+      {hasActual ? (
+        <span className="shrink-0 tabular-nums">
+          <span className="text-red-300/60">{match.actualRedScore}</span>
+          <span className="text-white/20">–</span>
+          <span className="text-sky-300/60">{match.actualBlueScore}</span>
+        </span>
+      ) : (
+        <span className="shrink-0 tabular-nums text-white/22">
+          {match.predictedRedScore.toFixed(0)}–{match.predictedBlueScore.toFixed(0)}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -317,15 +298,9 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
-      <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
-        <section className="rounded-[14px] border border-white/10 bg-[#090909] p-6">
-          <div className="text-[11px] uppercase tracking-[0.22em] text-white/34">Simulate</div>
-          <h1 className="mt-3 text-4xl font-medium tracking-[-0.08em] text-white sm:text-5xl">
-            simulate an event
-          </h1>
-          <p className="mt-3 max-w-3xl text-base text-white/58 sm:text-lg">
-            Pick an FTC event and simulate qualification matches and playoffs using current season team strength.
-          </p>
+      <div className="mx-auto max-w-6xl px-5 py-4 sm:px-8 sm:py-6">
+        <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
+          <h1 className="text-2xl font-medium tracking-[-0.05em] text-white sm:text-3xl">Simulate Event</h1>
           <SimulateControls
             key={`simulate-controls:${season}:${eventQuery}:${eventCode}:${simulations}:${scheduleMode}`}
             initialEventQuery={eventQuery}
@@ -339,17 +314,17 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
         </section>
 
         {!eventQuery ? (
-          <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-white/52">
+          <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-white/52">
             Search for an FTC event by name or event code to start.
           </section>
         ) : eventMatches.length === 0 && !selectedSimulation ? (
-          <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-[#ff9c9c]">
+          <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#ff9c9c]">
             No published events matched that search.
           </section>
         ) : (
           <>
             {eventCode && !selectedSimulation ? (
-              <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-[#ff9c9c]">
+              <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#ff9c9c]">
                 That event could not be loaded for simulation.
               </section>
             ) : null}
@@ -461,9 +436,9 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
                           {isRandom ? "One possible draw" : "Played + projected remaining"}
                         </div>
                       </div>
-                      <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-3">
+                      <div className="space-y-1">
                         {selectedSimulation.matches.map((match) => (
-                          <MatchCard key={match.key} match={match} isRandom={isRandom} />
+                          <MatchRow key={match.key} match={match} isRandom={isRandom} />
                         ))}
                       </div>
                     </section>

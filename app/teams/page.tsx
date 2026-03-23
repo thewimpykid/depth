@@ -21,15 +21,12 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
-      <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
-        <section className="rounded-[14px] border border-white/10 bg-[#090909] p-6">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto max-w-6xl px-5 py-4 sm:px-8 sm:py-6">
+        <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.22em] text-white/34">
-                Search
-              </div>
-              <h1 className="mt-3 text-4xl font-medium tracking-[-0.08em] text-white sm:text-5xl">
-                teams
+              <h1 className="text-2xl font-medium tracking-[-0.05em] text-white sm:text-3xl">
+                Teams
               </h1>
             </div>
             <div className="w-full max-w-2xl">
@@ -44,12 +41,12 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
           </div>
 
           {query && !validQuery ? (
-            <p className="mt-4 text-sm text-[#ff8f8f]">Enter a numeric FTC team number.</p>
+            <p className="mt-3 text-sm text-[#ff8f8f]">Enter a numeric FTC team number.</p>
           ) : null}
         </section>
 
         {!validQuery ? (
-          <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-sm text-white/52">
+          <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-white/52">
             Search for a team to load its events, matches, team names, and OPR values.
           </section>
         ) : (

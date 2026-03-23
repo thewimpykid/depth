@@ -9,7 +9,6 @@ import type {
   TeamEventDetails,
   TeamEventSummary,
   TeamMatch,
-  TeamMatchSide,
 } from "@/lib/ftc";
 
 const EVENT_DETAILS_SCHEMA_VERSION = "7";
@@ -57,26 +56,124 @@ function fmtPercent(value: number | null | undefined) {
   return `${Math.round(value)}%`;
 }
 
-function renderAllianceTeams(teams: TeamMatchSide[], highlight: boolean) {
-  if (teams.length === 0) {
-    return <div className="text-white/35">No teams listed</div>;
-  }
+
+
+function MatchRow({ match }: { match: TeamMatch }) {
+  const hasPrediction =
+    match.winProbability !== null &&
+    match.predictedRedScore !== null &&
+    match.predictedBlueScore !== null;
+
+  const hasActual = match.redScore !== null && match.blueScore !== null;
+
+  const winPct = match.winProbability;
+  const winPctColor =
+    winPct === null ? "text-white/40"
+    : winPct >= 65 ? "text-emerald-400"
+    : winPct >= 50 ? "text-emerald-300/80"
+    : winPct >= 35 ? "text-rose-300/80"
+    : "text-rose-400";
 
   return (
-    <div className="space-y-1">
-      {teams.map((team) => (
-        <Link
-          key={`${team.teamNumber}-${team.teamName ?? "team"}`}
-          href={`/teams?q=${team.teamNumber}`}
-          className={[
-            "block break-words leading-relaxed underline-offset-2 hover:underline",
-            highlight ? "font-medium text-white" : "text-white/78",
-          ].join(" ")}
-        >
-          {team.teamNumber}
-          {team.teamName ? ` / ${team.teamName}` : ""}
-        </Link>
-      ))}
+    <div className="overflow-hidden rounded-[10px] border border-white/10 bg-[#0b0b0b]">
+
+      {/* Header bar: match label + result */}
+      <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-2">
+        <div className="flex items-center gap-2.5">
+          <span className="text-sm font-semibold text-white/75">{match.description}</span>
+          <span className="text-[10px] uppercase tracking-widest text-white/25">{match.tournamentLevel}</span>
+        </div>
+        <div className="flex items-center gap-2.5">
+          {winPct !== null ? (
+            <span className={["text-base font-bold tabular-nums", winPctColor].join(" ")}>
+              {fmtPercent(winPct)}
+            </span>
+          ) : null}
+          {match.won !== null ? (
+            <span className={[
+              "rounded-[6px] border px-2.5 py-0.5 text-xs font-semibold",
+              match.won
+                ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-400"
+                : "border-rose-500/35 bg-rose-500/10 text-rose-400",
+            ].join(" ")}>
+              {match.won ? "Win" : "Loss"}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Alliance panels */}
+      <div className="grid grid-cols-2 divide-x divide-white/8">
+
+        {/* Red */}
+        <div className="bg-red-500/[0.055] px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
+            <div className="flex min-w-0 flex-wrap gap-x-2.5">
+              {match.redAlliance.map((t) => (
+                <Link
+                  key={t.teamNumber}
+                  href={`/teams?q=${t.teamNumber}`}
+                  className={[
+                    "text-sm tabular-nums underline-offset-2 hover:underline",
+                    match.alliance === "red" ? "font-bold text-red-200" : "font-normal text-white/60",
+                  ].join(" ")}
+                >
+                  {t.teamNumber}
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div className="mt-2.5 pl-[18px]">
+            <span className="text-xl font-bold tabular-nums tracking-tight text-red-300">
+              {hasActual ? match.redScore : hasPrediction ? `~${fmtNumber(match.predictedRedScore)}` : "—"}
+            </span>
+            {hasActual && hasPrediction ? (
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="text-xs text-white/35">Predicted</span>
+                <span className="text-sm font-semibold tabular-nums text-red-400/60">
+                  {fmtNumber(match.predictedRedScore)}
+                </span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Blue */}
+        <div className="bg-sky-400/[0.055] px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
+            <div className="flex min-w-0 flex-wrap gap-x-2.5">
+              {match.blueAlliance.map((t) => (
+                <Link
+                  key={t.teamNumber}
+                  href={`/teams?q=${t.teamNumber}`}
+                  className={[
+                    "text-sm tabular-nums underline-offset-2 hover:underline",
+                    match.alliance === "blue" ? "font-bold text-sky-200" : "font-normal text-white/60",
+                  ].join(" ")}
+                >
+                  {t.teamNumber}
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div className="mt-2.5 pl-[18px]">
+            <span className="text-xl font-bold tabular-nums tracking-tight text-sky-300">
+              {hasActual ? match.blueScore : hasPrediction ? `~${fmtNumber(match.predictedBlueScore)}` : "—"}
+            </span>
+            {hasActual && hasPrediction ? (
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="text-xs text-white/35">Predicted</span>
+                <span className="text-sm font-semibold tabular-nums text-sky-400/60">
+                  {fmtNumber(match.predictedBlueScore)}
+                </span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
@@ -85,128 +182,14 @@ function MatchList({ matches }: { matches: TeamMatch[] }) {
   return (
     <div className="mt-5">
       {matches.length === 0 ? (
-        <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-6 text-center text-base text-white/72">
+        <div className="rounded-[8px] border border-white/8 bg-[#0d0d0d] px-4 py-3 text-sm text-white/50 text-center">
           This event has not yet begun.
         </div>
       ) : (
-        <div className="space-y-3">
-          {matches.map((match, index) => {
-            const hasPrediction =
-              match.winProbability !== null &&
-              match.predictedRedScore !== null &&
-              match.predictedBlueScore !== null;
-
-            return (
-              <article
-                key={`${match.key}:${index}`}
-                className="rounded-[12px] border border-white/10 bg-[#101010]"
-              >
-                <div className="grid gap-3 border-b border-white/10 px-4 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-lg font-medium text-white">{match.description}</div>
-                      {match.alliance ? (
-                        <div
-                          className={[
-                            "rounded-[6px] border px-2 py-1 text-[11px] uppercase tracking-[0.12em]",
-                            match.alliance === "red"
-                              ? "border-[#5a2424] bg-[#211010] text-[#f1b0b0]"
-                              : "border-[#22436e] bg-[#101d30] text-[#a9c7ff]",
-                          ].join(" ")}
-                        >
-                          Team on {match.alliance}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="mt-1 text-xs uppercase tracking-[0.12em] text-white/38">
-                      {match.tournamentLevel}
-                    </div>
-                    <div className="mt-2 text-sm text-white/50">
-                      {match.start ? new Date(match.start).toLocaleString() : "TBD"}
-                      {match.field ? ` / Field ${match.field}` : ""}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[10px] border border-white/10 bg-[#0b0b0b] px-3 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.12em] text-white/38">
-                        Actual score
-                      </div>
-                      <div className="mt-2 text-lg font-medium text-white">
-                        {match.redScore ?? "N/A"} - {match.blueScore ?? "N/A"}
-                      </div>
-                      <div
-                        className={[
-                          "mt-2 inline-flex rounded-[6px] border px-2 py-1 text-[11px] uppercase tracking-[0.12em]",
-                          match.won === null
-                            ? "border-white/10 text-white/45"
-                            : match.won
-                              ? "border-[#244d2b] bg-[#0f1d12] text-[#9bd3a6]"
-                              : "border-[#5a2424] bg-[#211010] text-[#e1a3a3]",
-                        ].join(" ")}
-                      >
-                        {match.won === null ? "No result" : match.won ? "Win" : "Loss"}
-                      </div>
-                    </div>
-
-                    <div className="rounded-[10px] border border-white/10 bg-[#0b0b0b] px-3 py-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/38">
-                          Predicted score
-                        </div>
-                        <div
-                          className={[
-                            "inline-flex rounded-[6px] border px-2 py-1 text-[11px] uppercase tracking-[0.12em]",
-                            match.winProbability === null
-                              ? "border-white/10 text-white/45"
-                              : match.winProbability >= 60
-                                ? "border-[#244d2b] bg-[#0f1d12] text-[#9bd3a6]"
-                                : match.winProbability >= 45
-                                  ? "border-white/10 bg-[#141414] text-white/72"
-                                  : "border-[#5a2424] bg-[#211010] text-[#e1a3a3]",
-                          ].join(" ")}
-                        >
-                          {fmtPercent(match.winProbability)}
-                        </div>
-                      </div>
-                      <div className="mt-2 text-lg font-medium text-white">
-                        {hasPrediction
-                          ? `${fmtNumber(match.predictedRedScore)} - ${fmtNumber(match.predictedBlueScore)}`
-                          : "Unavailable"}
-                      </div>
-                      <div className="mt-2 text-xs text-white/46">
-                        {hasPrediction
-                          ? "Based on current event OPR"
-                          : match.predictionSampleSize > 0
-                            ? "Prediction unavailable"
-                            : "No played qualification data yet"}
-                      </div>
-                      {match.alliance ? (
-                        <div className="mt-2 text-xs text-white/46">
-                          {match.alliance === "red" ? "Red" : "Blue"} alliance perspective
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-px bg-white/10 lg:grid-cols-2">
-                  <div className="bg-[#341515] px-4 py-4">
-                    <div className="mb-3 text-[11px] uppercase tracking-[0.12em] text-[#efc3c3]">
-                      Red Alliance
-                    </div>
-                    {renderAllianceTeams(match.redAlliance, match.alliance === "red")}
-                  </div>
-                  <div className="bg-[#162c4c] px-4 py-4">
-                    <div className="mb-3 text-[11px] uppercase tracking-[0.12em] text-[#bfd4ff]">
-                      Blue Alliance
-                    </div>
-                    {renderAllianceTeams(match.blueAlliance, match.alliance === "blue")}
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+        <div className="space-y-2">
+          {matches.map((match, index) => (
+            <MatchRow key={`${match.key}:${index}`} match={match} />
+          ))}
         </div>
       )}
     </div>
@@ -216,22 +199,22 @@ function MatchList({ matches }: { matches: TeamMatch[] }) {
 function OprChips({ currentOpr }: { currentOpr: OprBreakdown | null }) {
   if (!currentOpr) return null;
 
-  const items: Array<{ label: string; value: number | null; tone: string }> = [
-    { label: "Total NP", value: currentOpr.total, tone: "text-white bg-[#101010]" },
-    { label: "Auto", value: currentOpr.auto, tone: "text-[#8dc3ff] bg-[#0e1621]" },
-    { label: "Teleop", value: currentOpr.teleop, tone: "text-[#ffb36b] bg-[#20140b]" },
-    { label: "Endgame", value: currentOpr.endgame, tone: "text-[#8be0a4] bg-[#0d1c12]" },
+  const items: Array<{ label: string; value: number | null; tone: string; valTone: string }> = [
+    { label: "Total NP", value: currentOpr.total, tone: "bg-white/[0.04] border-white/12", valTone: "text-white" },
+    { label: "Auto", value: currentOpr.auto, tone: "bg-sky-500/10 border-sky-500/20", valTone: "text-sky-300" },
+    { label: "Teleop", value: currentOpr.teleop, tone: "bg-orange-400/10 border-orange-400/20", valTone: "text-orange-300" },
+    { label: "Endgame", value: currentOpr.endgame, tone: "bg-emerald-500/10 border-emerald-500/20", valTone: "text-emerald-300" },
   ];
 
   return (
-    <div className="mt-4 flex flex-wrap gap-2 text-sm">
+    <div className="mt-3 flex flex-wrap gap-2 text-xs">
       {items.map((item) => (
         <div
           key={item.label}
-          className={`rounded-[8px] border border-white/10 px-3 py-2 ${item.tone}`}
+          className={`rounded-[7px] border px-3 py-1.5 ${item.tone}`}
         >
-          <span className="text-white/52">{item.label}</span>
-          <span className="ml-2 font-medium text-current">{fmtNumber(item.value)}</span>
+          <span className="text-white/45">{item.label}</span>
+          <span className={`ml-2 font-semibold ${item.valTone}`}>{fmtNumber(item.value)}</span>
         </div>
       ))}
     </div>
@@ -243,7 +226,7 @@ function buildChartCoordinates(points: OprTrendPoint[], metric: keyof OprBreakdo
   if (values.length === 0) return null;
 
   const width = 720;
-  const height = 220;
+  const height = 180;
   const left = 18;
   const right = 18;
   const top = 12;
@@ -284,7 +267,7 @@ function OprTrendChart({ points }: { points: OprTrendPoint[] }) {
 
   if (points.length === 0) {
     return (
-      <div className="mt-5 rounded-[10px] border border-white/10 bg-[#101010] px-4 py-5 text-sm text-white/45">
+      <div className="mt-3 rounded-[8px] border border-white/8 bg-[#0d0d0d] px-3 py-2 text-xs text-white/40">
         Not enough played qualification matches for an OPR trend yet.
       </div>
     );
@@ -303,16 +286,9 @@ function OprTrendChart({ points }: { points: OprTrendPoint[] }) {
   ];
 
   return (
-    <div className="mt-5 rounded-[10px] border border-white/10 bg-[#101010] p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="text-sm font-medium uppercase tracking-[0.12em] text-white/42">
-            OPR Over Time
-          </div>
-          <div className="mt-1 text-sm text-white/52">
-            Recomputed after each played qualification match for this team.
-          </div>
-        </div>
+    <div className="mt-4 rounded-[10px] border border-white/8 bg-[#0d0d0d] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-xs font-medium uppercase tracking-[0.1em] text-white/40">OPR Over Time</div>
 
         <label className="sr-only" htmlFor={`opr-metric-${points[0]?.label ?? "event"}`}>
           OPR metric
@@ -321,7 +297,7 @@ function OprTrendChart({ points }: { points: OprTrendPoint[] }) {
           id={`opr-metric-${points[0]?.label ?? "event"}`}
           value={metric}
           onChange={(event) => setMetric(event.target.value as keyof OprBreakdown)}
-          className="h-10 rounded-[8px] border border-white/10 bg-[#090909] px-3 text-sm text-white outline-none"
+          className="h-7 rounded-[6px] border border-white/10 bg-[#090909] px-2 text-xs text-white outline-none"
         >
           {metricOptions.map((option) => (
             <option key={option.key} value={option.key}>
@@ -331,10 +307,10 @@ function OprTrendChart({ points }: { points: OprTrendPoint[] }) {
         </select>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-3">
         <svg
           viewBox={`0 0 ${chart.width} ${chart.height}`}
-          className="h-[220px] w-full"
+          className="h-[180px] w-full"
           role="img"
           aria-label={`OPR over time for ${metric}`}
         >
@@ -348,13 +324,13 @@ function OprTrendChart({ points }: { points: OprTrendPoint[] }) {
           />
           <polyline
             points={chart.area}
-            fill="rgba(88, 128, 255, 0.12)"
+            fill="rgba(99, 102, 241, 0.15)"
             stroke="none"
           />
           <polyline
             points={chart.line}
             fill="none"
-            stroke="#90a3ff"
+            stroke="#818cf8"
             strokeWidth="2"
           />
           {chart.coordinates.map((point, index) => {
@@ -402,29 +378,29 @@ function EventStatsRow({ event }: { event: TeamEventSummary }) {
   if (!event.statsAvailable) return null;
 
   return (
-    <div className="mt-4 flex flex-wrap gap-2 text-sm">
+    <div className="mt-3 flex flex-wrap gap-2 text-xs">
       {event.rank !== null ? (
-        <div className="rounded-[8px] border border-white/10 bg-[#101010] px-3 py-2 text-white/78">
+        <div className="rounded-[6px] border border-white/10 bg-[#101010] px-2.5 py-1.5 text-white/70">
           Rank {event.rank}
         </div>
       ) : null}
       {event.record ? (
-        <div className="rounded-[8px] border border-white/10 bg-[#101010] px-3 py-2 text-white/78">
-          Record {event.record}
+        <div className="rounded-[6px] border border-white/10 bg-[#101010] px-2.5 py-1.5 text-white/70">
+          {event.record}
         </div>
       ) : null}
       {event.rp !== null ? (
-        <div className="rounded-[8px] border border-white/10 bg-[#101010] px-3 py-2 text-white/78">
+        <div className="rounded-[6px] border border-white/10 bg-[#101010] px-2.5 py-1.5 text-white/70">
           RP {fmtNumber(event.rp)}
         </div>
       ) : null}
       {event.npOpr !== null ? (
-        <div className="rounded-[8px] border border-white/10 bg-[#101010] px-3 py-2 text-white/78">
+        <div className="rounded-[6px] border border-white/10 bg-[#101010] px-2.5 py-1.5 text-white/70">
           NP OPR {fmtNumber(event.npOpr)}
         </div>
       ) : null}
       {event.npAverage !== null ? (
-        <div className="rounded-[8px] border border-white/10 bg-[#101010] px-3 py-2 text-white/78">
+        <div className="rounded-[6px] border border-white/10 bg-[#101010] px-2.5 py-1.5 text-white/70">
           NP AVG {fmtNumber(event.npAverage)}
         </div>
       ) : null}
@@ -434,7 +410,7 @@ function EventStatsRow({ event }: { event: TeamEventSummary }) {
 
 function LoadingMatches() {
   return (
-    <div className="mt-5 rounded-[10px] border border-white/10 bg-[#101010] px-4 py-5 text-sm text-white/45">
+    <div className="mt-3 rounded-[8px] border border-white/8 bg-[#0d0d0d] px-3 py-2 text-xs text-white/40">
       Loading matches...
     </div>
   );
@@ -581,14 +557,14 @@ export default function TeamEvents({
 
   if (events.length === 0) {
     return (
-      <section className="mt-6 rounded-[12px] border border-white/10 bg-[#090909] p-6 text-base text-white/55">
+      <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-white/55">
         No published events found for {season}.
       </section>
     );
   }
 
   return (
-    <div className="mt-6 space-y-4">
+    <div className="mt-4 space-y-4">
       {events.map((event) => {
         const eventState = state[event.eventCode];
 
@@ -599,31 +575,31 @@ export default function TeamEvents({
               sectionRefs.current[event.eventCode] = node;
             }}
             data-event-code={event.eventCode}
-            className="rounded-[12px] border border-white/10 bg-[#090909] p-5 sm:p-6"
+            className="rounded-[12px] border border-white/10 bg-[#090909] p-5"
           >
-            <div className="flex flex-col gap-3">
-              <div className="text-[11px] uppercase tracking-[0.16em] text-white/34">
-                {event.eventCode}
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <Link
+                  href={`/matches?season=${season}&eventCode=${encodeURIComponent(event.eventCode)}&eventQuery=${encodeURIComponent(event.eventName)}`}
+                  className="group"
+                >
+                  <h2 className="text-xl font-medium tracking-[-0.04em] text-white underline-offset-3 group-hover:underline">
+                    {event.eventName}
+                  </h2>
+                </Link>
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-white/48">
+                  <span className="uppercase tracking-[0.1em] text-white/30">{event.eventCode}</span>
+                  <span>{fmtDateRange(event.start, event.end)}</span>
+                  {event.location ? <span className="text-[#98a2ff]/80">{event.location}</span> : null}
+                </div>
               </div>
-              <Link
-                href={`/matches?season=${season}&eventCode=${encodeURIComponent(event.eventCode)}&eventQuery=${encodeURIComponent(event.eventName)}`}
-                className="group w-fit"
-              >
-                <h2 className="text-3xl font-medium tracking-[-0.05em] text-white underline-offset-4 group-hover:underline sm:text-[2rem]">
-                  {event.eventName}
-                </h2>
-              </Link>
-              <div className="text-base text-white/76">{fmtDateRange(event.start, event.end)}</div>
-              {event.location ? (
-                <div className="break-words text-base text-[#98a2ff]">{event.location}</div>
-              ) : null}
             </div>
 
             <EventStatsRow event={event} />
             <OprChips currentOpr={eventState?.data?.currentOpr ?? null} />
 
             {eventState?.data?.awards.length ? (
-              <div className="mt-4 border-t border-white/10 pt-4 text-sm text-white/84">
+              <div className="mt-3 border-t border-white/10 pt-3 text-xs text-white/70">
                 {eventState.data.awards.join(", ")}
               </div>
             ) : null}
@@ -631,7 +607,7 @@ export default function TeamEvents({
             {eventState?.loading ? (
               <LoadingMatches />
             ) : eventState?.error ? (
-              <div className="mt-5 rounded-[10px] border border-white/10 bg-[#101010] p-4 text-sm text-[#ff8f8f]">
+              <div className="mt-4 rounded-[8px] border border-white/10 bg-[#101010] p-3 text-sm text-[#ff8f8f]">
                 {eventState.error}
               </div>
             ) : eventState?.data ? (

@@ -38,9 +38,9 @@ function SummaryItem({
   accent?: boolean;
 }) {
   return (
-    <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">{label}</div>
-      <div className={accent ? "mt-1 text-base text-[#98a2ff]" : "mt-1 text-base text-white/86"}>
+    <div className="rounded-[10px] border border-white/10 bg-[#101010] px-3 py-2.5">
+      <div className="text-[10px] uppercase tracking-[0.12em] text-white/36">{label}</div>
+      <div className={accent ? "mt-1 text-sm font-medium text-indigo-300" : "mt-1 text-sm text-white/86"}>
         {value}
       </div>
     </div>
@@ -57,15 +57,12 @@ function QuickStatCard({
   rankText: string;
 }) {
   return (
-    <article className="rounded-[10px] border border-white/10 bg-[#101010] p-4">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">{label}</div>
-      <div className="mt-3 text-3xl font-medium tracking-[-0.05em] text-white">
+    <article className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
+      <div className="text-[10px] uppercase tracking-[0.1em] text-white/36">{label}</div>
+      <div className="mt-1.5 text-xl font-bold tracking-[-0.04em] text-white">
         {formatRankedValue(value)}
       </div>
-      <div className="mt-3 border-t border-white/10 pt-3">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Rank / Percentile</div>
-        <div className="mt-2 text-sm text-white/76">{rankText}</div>
-      </div>
+      <div className="mt-1.5 text-xs text-indigo-300/70">{rankText}</div>
     </article>
   );
 }
@@ -73,22 +70,21 @@ function QuickStatCard({
 function LoadingState() {
   return (
     <>
-      <section className="mt-6 rounded-[12px] border border-white/10 bg-[#090909] p-6">
-        <div className="h-10 w-80 bg-white/8" />
-        <div className="mt-5 space-y-3">
-          <div className="h-4 w-40 bg-white/8" />
-          <div className="h-4 w-32 bg-white/8" />
-          <div className="h-4 w-28 bg-white/8" />
+      <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-4">
+        <div className="h-7 w-64 bg-white/8" />
+        <div className="mt-4 space-y-2">
+          <div className="h-3 w-40 bg-white/8" />
+          <div className="h-3 w-32 bg-white/8" />
         </div>
       </section>
 
-      <section className="mt-6 rounded-[12px] border border-white/10 bg-[#090909] p-6">
-        <div className="h-12 w-full bg-white/8" />
+      <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-4">
+        <div className="h-9 w-full bg-white/8" />
       </section>
 
-      <section className="mt-6 rounded-[12px] border border-white/10 bg-[#090909] p-6">
-        <div className="h-7 w-40 bg-white/8" />
-        <div className="mt-5 h-28 w-full bg-white/8" />
+      <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-4">
+        <div className="h-5 w-32 bg-white/8" />
+        <div className="mt-4 h-20 w-full bg-white/8" />
       </section>
     </>
   );
@@ -97,17 +93,17 @@ function LoadingState() {
 function QuickStatsTable({ data }: { data: TeamPageResult["quickStats"] }) {
   if (!data) {
     return (
-      <section className="mt-6 rounded-[12px] border border-white/10 bg-[#090909] p-6">
-        <div className="text-2xl font-medium tracking-[-0.04em] text-white">Quick Stats</div>
-        <div className="mt-4 text-sm text-white/45">No published season stats yet.</div>
+      <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-4">
+        <div className="text-base font-medium text-white">Quick Stats</div>
+        <div className="mt-3 text-sm text-white/45">No published season stats yet.</div>
       </section>
     );
   }
 
   return (
-    <section className="mt-6 rounded-[12px] border border-white/10 bg-[#090909] p-5 sm:p-6">
+    <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-5">
       <div className="flex items-center justify-between gap-4">
-        <div className="text-2xl font-medium tracking-[-0.04em] text-white">Quick Stats</div>
+        <div className="text-base font-medium text-white">Quick Stats</div>
         {data.comparedAgainst ? (
           <div className="text-xs uppercase tracking-[0.14em] text-white/38">
             {data.comparedAgainst} teams
@@ -208,21 +204,18 @@ export default function TeamSummary({
 
   return (
     <>
-      <section className="mt-6 rounded-[12px] border border-white/10 bg-[#090909] p-5 sm:p-6">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,0.8fr)]">
+      <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(16rem,0.8fr)]">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.16em] text-white/34">
-              Team Profile
-            </div>
-            <div className="mt-3 text-4xl font-medium tracking-[-0.06em] text-white sm:text-[2.8rem]">
+            <div className="text-2xl font-medium tracking-[-0.05em] text-white sm:text-3xl">
               {data.teamNumber} - {data.team?.name ?? `Team ${data.teamNumber}`}
             </div>
             {data.team?.organization ? (
-              <div className="mt-3 text-lg text-white/80">{data.team.organization}</div>
+              <div className="mt-1 text-sm text-white/70">{data.team.organization}</div>
             ) : null}
           </div>
 
-          <div className="grid gap-3">
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
             {data.team?.location ? (
               <SummaryItem label="Location" value={data.team.location} accent />
             ) : null}
@@ -234,7 +227,7 @@ export default function TeamSummary({
         </div>
       </section>
 
-      <section className="mt-6 rounded-[12px] border border-white/10 bg-[#090909] p-2">
+      <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-2">
         <label className="sr-only" htmlFor="season-select">
           Season
         </label>
@@ -245,7 +238,7 @@ export default function TeamSummary({
             const nextSeason = event.target.value;
             router.push(`/teams?q=${data.teamNumber}&season=${nextSeason}`);
           }}
-          className="h-12 w-full rounded-[10px] border border-transparent bg-[#111111] px-4 text-lg text-white outline-none"
+          className="h-9 w-full rounded-[8px] border border-transparent bg-[#111111] px-3 text-sm text-white outline-none"
         >
           {availableSeasons.map((season) => (
             <option key={season} value={season}>

@@ -171,16 +171,9 @@ export default async function MatchesPage(props: PageProps<"/matches">) {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
-      <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
-        <section className="rounded-[14px] border border-white/10 bg-[#090909] p-6">
-          <div className="text-[11px] uppercase tracking-[0.22em] text-white/34">Matches</div>
-          <h1 className="mt-3 text-4xl font-medium tracking-[-0.08em] text-white sm:text-5xl">
-            matches
-          </h1>
-          <p className="mt-3 max-w-3xl text-base text-white/58 sm:text-lg">
-            Search an event, pick it, and browse the published qualification schedule and scores.
-          </p>
-
+      <div className="mx-auto max-w-6xl px-5 py-4 sm:px-8 sm:py-6">
+        <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
+          <h1 className="text-2xl font-medium tracking-[-0.05em] text-white sm:text-3xl">Matches</h1>
           <EventSearchForm
             initialQuery={eventQuery}
             initialCode={eventCode}
@@ -192,26 +185,28 @@ export default async function MatchesPage(props: PageProps<"/matches">) {
         </section>
 
         {!eventQuery ? (
-          <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-white/52">
+          <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-white/52">
             Search for an event to view published matches.
           </section>
         ) : results.length === 0 && !event ? (
-          <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-[#ff9c9c]">
+          <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#ff9c9c]">
             No published events matched that search.
           </section>
         ) : (
           <>
             {results.length > 0 && !event ? (
-              <section className="mt-6 grid gap-4 xl:grid-cols-2">
+              <section className="mt-4 grid gap-3 xl:grid-cols-2">
                 {results.map((result) => (
-                  <article key={result.code} className="rounded-[14px] border border-white/10 bg-[#090909] p-5">
-                    <div className="text-2xl font-medium tracking-[-0.04em] text-white">{result.name}</div>
-                    <div className="mt-2 text-sm uppercase tracking-[0.14em] text-white/38">{result.code}</div>
-                    <div className="mt-3 text-base text-white/74">{fmtDateRange(result.start, result.end)}</div>
-                    <div className="mt-1 text-sm italic text-white/48">{result.location ?? "Location unavailable"}</div>
+                  <article key={result.code} className="rounded-[10px] border border-white/10 bg-[#090909] p-4">
+                    <div className="text-base font-medium text-white">{result.name}</div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-white/42">
+                      <span className="uppercase tracking-[0.1em]">{result.code}</span>
+                      <span>{fmtDateRange(result.start, result.end)}</span>
+                      {result.location ? <span className="italic">{result.location}</span> : null}
+                    </div>
                     <a
                       href={`/matches?season=${season}&eventCode=${encodeURIComponent(result.code)}&eventQuery=${encodeURIComponent(result.name)}`}
-                      className="mt-4 inline-flex rounded-[10px] border border-white/10 bg-white px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-black"
+                      className="mt-3 inline-flex rounded-[8px] border border-white/10 bg-white px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-black"
                     >
                       Open event
                     </a>
@@ -222,73 +217,55 @@ export default async function MatchesPage(props: PageProps<"/matches">) {
 
             {event ? (
               <>
-                <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-5 sm:p-6">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
+                <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[11px] uppercase tracking-[0.16em] text-white/34">Selected Event</div>
-                      <div className="mt-3 text-3xl font-medium tracking-[-0.06em] text-white sm:text-4xl">
-                        {event.name}
+                      <div className="text-base font-medium text-white">{event.name}</div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-white/42">
+                        <span>{fmtDateRange(event.start, event.end)}</span>
+                        {event.location ? <span className="italic">{event.location}</span> : null}
                       </div>
-                      <div className="mt-3 text-base text-white/74">{fmtDateRange(event.start, event.end)}</div>
-                      <div className="mt-1 text-sm italic text-white/48">{event.location ?? "Location unavailable"}</div>
                     </div>
-                    <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3 text-sm text-white/72">
-                      Event code {event.code}
-                    </div>
+                    <span className="shrink-0 rounded-[6px] border border-white/10 bg-[#111111] px-2 py-1 text-xs text-white/50">{event.code}</span>
                   </div>
                 </section>
 
                 {matches.length === 0 ? (
-                  <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-white/52">
+                  <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-white/52">
                     No published qualification matches yet for this event.
                   </section>
                 ) : (
-                  <section className="mt-6 grid gap-4 2xl:grid-cols-2">
-                    {matches.map((match) => (
-                      <article key={match.key} className="rounded-[14px] border border-white/10 bg-[#090909] p-5">
-                        <div className="flex flex-wrap items-start justify-between gap-4">
-                          <div>
-                            <div className="text-[11px] uppercase tracking-[0.14em] text-white/36">Qualification Match</div>
-                            <div className="mt-2 text-2xl font-medium tracking-[-0.04em] text-white">{match.description}</div>
+                  <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] p-3">
+                    <div className="space-y-1">
+                      {matches.map((match) => {
+                        const played = match.redScore !== null || match.blueScore !== null;
+                        return (
+                          <div key={match.key} className="flex items-center gap-2 rounded-[8px] border border-white/8 bg-[#0d0d0d] px-3 py-2 text-xs">
+                            <span className="w-16 shrink-0 font-medium tabular-nums text-white/60">{match.description}</span>
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500/50" />
+                            <span className="min-w-0 flex-1 truncate text-white/70">
+                              {match.redAlliance.map((t) => t.teamNumber).join(" · ")}
+                            </span>
+                            <span className="shrink-0 text-white/18">vs</span>
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400/50" />
+                            <span className="min-w-0 flex-1 truncate text-white/70">
+                              {match.blueAlliance.map((t) => t.teamNumber).join(" · ")}
+                            </span>
+                            {played ? (
+                              <span className="shrink-0 tabular-nums">
+                                <span className="text-red-300/60">{match.redScore ?? "?"}</span>
+                                <span className="text-white/20">–</span>
+                                <span className="text-sky-300/60">{match.blueScore ?? "?"}</span>
+                              </span>
+                            ) : (
+                              <span className="shrink-0 text-white/22">
+                                {match.start ? new Date(match.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "TBD"}
+                              </span>
+                            )}
                           </div>
-                          <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-2 text-sm text-white/76">
-                            {match.start ? new Date(match.start).toLocaleString() : "TBD"}
-                          </div>
-                        </div>
-
-                        <div className="mt-4 rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
-                          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Score</div>
-                          <div className="mt-2 text-2xl font-medium tracking-[-0.04em] text-white">
-                            {match.redScore ?? "N/A"} - {match.blueScore ?? "N/A"}
-                          </div>
-                        </div>
-
-                        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                          <div className="rounded-[10px] border border-[#552222] bg-[#170d0d] px-4 py-4">
-                            <div className="mb-3 text-[11px] uppercase tracking-[0.12em] text-[#f0b9b9]">Red Alliance</div>
-                            <div className="space-y-2">
-                              {match.redAlliance.map((team) => (
-                                <div key={`red-${match.key}-${team.teamNumber}`} className="rounded-[8px] border border-white/10 bg-black/15 px-3 py-3">
-                                  <div className="text-base font-medium text-white">{team.teamNumber}</div>
-                                  <div className="text-sm text-white/72">{team.name ?? "Unknown team"}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="rounded-[10px] border border-[#1e3a5f] bg-[#0d1520] px-4 py-4">
-                            <div className="mb-3 text-[11px] uppercase tracking-[0.12em] text-[#bdd5ff]">Blue Alliance</div>
-                            <div className="space-y-2">
-                              {match.blueAlliance.map((team) => (
-                                <div key={`blue-${match.key}-${team.teamNumber}`} className="rounded-[8px] border border-white/10 bg-black/15 px-3 py-3">
-                                  <div className="text-base font-medium text-white">{team.teamNumber}</div>
-                                  <div className="text-sm text-white/72">{team.name ?? "Unknown team"}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
+                        );
+                      })}
+                    </div>
                   </section>
                 )}
               </>

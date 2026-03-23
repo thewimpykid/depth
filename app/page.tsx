@@ -361,11 +361,11 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
-      <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-10">
+      <div className="mx-auto max-w-6xl px-5 py-4 sm:px-8 sm:py-6">
         <div className="mx-auto max-w-5xl">
 
           {/* ── Hero ── */}
-          <section className="relative overflow-hidden rounded-[14px] border border-white/8 bg-[#090909] px-6 py-12 text-center sm:px-10 sm:py-18">
+          <section className="relative overflow-hidden rounded-[12px] border border-white/8 bg-[#090909] px-6 py-10 text-center sm:px-10 sm:py-14">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/14 to-transparent" />
             <div className="pointer-events-none absolute left-1/2 top-0 h-64 w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.04] blur-3xl" />
 
@@ -418,7 +418,7 @@ export default async function Home() {
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <Link
               href="/simulate"
-              className="group rounded-[14px] border border-white/8 bg-[#090909] p-5 transition-colors hover:border-white/16 hover:bg-[#0b0b0b] sm:p-6"
+              className="group rounded-[12px] border border-white/8 bg-[#090909] p-4 transition-colors hover:border-white/16 hover:bg-[#0b0b0b]"
             >
               <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/28 transition-colors group-hover:text-white/44">
                 Simulate
@@ -436,7 +436,7 @@ export default async function Home() {
 
             <Link
               href="/compare"
-              className="group rounded-[14px] border border-white/8 bg-[#090909] p-5 transition-colors hover:border-white/16 hover:bg-[#0b0b0b] sm:p-6"
+              className="group rounded-[12px] border border-white/8 bg-[#090909] p-4 transition-colors hover:border-white/16 hover:bg-[#0b0b0b]"
             >
               <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/28 transition-colors group-hover:text-white/44">
                 Compare
@@ -454,7 +454,7 @@ export default async function Home() {
 
             <Link
               href={`/season-records?season=${requestedSeason}&view=matches&rank=best&sort=totalNp`}
-              className="group rounded-[14px] border border-white/8 bg-[#090909] p-5 transition-colors hover:border-white/16 hover:bg-[#0b0b0b] sm:p-6"
+              className="group rounded-[12px] border border-white/8 bg-[#090909] p-4 transition-colors hover:border-white/16 hover:bg-[#0b0b0b]"
             >
               <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/28 transition-colors group-hover:text-white/44">
                 Records
@@ -472,7 +472,7 @@ export default async function Home() {
           </div>
 
           {/* ── Today's Events ── */}
-          <section className="mt-3 rounded-[14px] border border-white/8 bg-[#090909] p-5 sm:p-6">
+          <section className="mt-3 rounded-[12px] border border-white/8 bg-[#090909] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 pb-4">
               <div className="text-xl font-medium tracking-[-0.04em] text-white">
                 Today&apos;s Events
@@ -504,7 +504,7 @@ export default async function Home() {
           </section>
 
           {/* ── World Record ── */}
-          <section className="mt-3 rounded-[14px] border border-white/8 bg-[#090909] p-5 sm:p-6">
+          <section className="mt-3 rounded-[12px] border border-white/8 bg-[#090909] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 pb-4">
               <div className="text-xl font-medium tracking-[-0.04em] text-white">
                 World Record

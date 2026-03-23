@@ -154,6 +154,8 @@ function buildEventMetadata(events: unknown[]) {
   return metadata;
 }
 
+const PAGE_SIZE = 50;
+
 function createQueryString(
   season: number,
   view: SeasonRecordsView,
@@ -163,6 +165,7 @@ function createQueryString(
   startDate: string,
   endDate: string,
   sort: string,
+  page?: number,
 ) {
   const params = new URLSearchParams();
   params.set("season", String(season));
@@ -173,16 +176,8 @@ function createQueryString(
   if (startDate) params.set("startDate", startDate);
   if (endDate) params.set("endDate", endDate);
   if (sort) params.set("sort", sort);
+  if (page && page > 1) params.set("page", String(page));
   return params.toString();
-}
-
-function displayRank(
-  row: TeamSeasonRecordRow | MatchSeasonRecordRow,
-  rankMode: SeasonRankMode,
-) {
-  const rank = rankMode === "best" ? row.rankBest : row.rankAll;
-  const skip = rankMode === "best" ? row.rankBestSkip : row.rankAllSkip;
-  return skip > 0 ? "" : formatOrdinal(rank);
 }
 
 function compareNullableNumbers(a: number | null, b: number | null) {
@@ -192,184 +187,108 @@ function compareNullableNumbers(a: number | null, b: number | null) {
   return b - a;
 }
 
-function MetricCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function TeamRecordRow({ row, rank }: { row: TeamSeasonRecordRow; rank: number }) {
   return (
-    <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">{label}</div>
-      <div className="mt-2 text-base text-white/88">{value}</div>
+    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.4fr)_5rem_5rem_5rem_5rem_4rem] items-center gap-x-4 rounded-[8px] border border-white/8 bg-[#101010] px-3 py-2.5 text-sm">
+      <span className="tabular-nums text-white/40">{formatOrdinal(rank)}</span>
+      <div className="min-w-0">
+        <Link href={`/teams?q=${row.teamNumber}`} className="font-medium text-white hover:text-white/80">
+          {row.teamNumber}
+        </Link>
+        <div className="truncate text-xs text-white/46 italic">{row.teamName ?? "—"}</div>
+      </div>
+      <div className="min-w-0">
+        <div className="truncate text-xs text-white/62">{row.eventName}</div>
+        <div className="text-[10px] text-white/32">{formatEventDate(row.eventStart, row.eventEnd)}</div>
+      </div>
+      <span className="tabular-nums text-right text-white/72">{formatNumber(row.npOpr)}</span>
+      <span className="tabular-nums text-right text-white/72">{formatNumber(row.autoOpr)}</span>
+      <span className="tabular-nums text-right text-white/72">{formatNumber(row.teleopOpr)}</span>
+      <span className="tabular-nums text-right text-white/72">{formatNumber(row.npAverage)}</span>
+      <span className="tabular-nums text-right text-white/44">{formatOrdinal(row.eventRank) || "—"}</span>
     </div>
   );
 }
 
-function TeamRowCard({
-  row,
-  rankMode,
-}: {
-  row: TeamSeasonRecordRow;
-  rankMode: SeasonRankMode;
-}) {
-  const display = displayRank(row, rankMode);
-
+function MatchRecordRow({ row, rank }: { row: MatchSeasonRecordRow; rank: number }) {
   return (
-    <article className="rounded-[12px] border border-white/10 bg-[#101010] p-4 sm:p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            {display ? (
-              <div className="rounded-[8px] border border-white/10 bg-[#0b0b0b] px-3 py-2 text-sm uppercase tracking-[0.12em] text-white/72">
-                {display}
-              </div>
-            ) : null}
-            <div className="min-w-0">
-              <div className="text-2xl font-medium tracking-[-0.04em] text-white">
-                {row.teamNumber ?? "N/A"}
-              </div>
-              <div className="truncate text-base italic text-white/72">
-                {row.teamName ?? "Unknown team"}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="text-base text-white">{row.eventName}</div>
-            <div className="mt-1 text-sm italic text-white/48">
-              {formatEventDate(row.eventStart, row.eventEnd)}
-            </div>
-          </div>
+    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.6fr)_5rem_5rem_5rem_minmax(0,1fr)] items-center gap-x-4 rounded-[8px] border border-white/8 bg-[#101010] px-3 py-2.5 text-sm">
+      <span className="tabular-nums text-white/40">{formatOrdinal(rank)}</span>
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="font-medium text-white">{row.matchLabel}</span>
+          {row.alliance ? (
+            <span className={["text-[10px] font-semibold uppercase", row.alliance === "Red" ? "text-red-400/70" : "text-sky-400/70"].join(" ")}>
+              {row.alliance}
+            </span>
+          ) : null}
         </div>
-
-        <div className="rounded-[10px] border border-white/10 bg-[#0b0b0b] px-4 py-3 lg:min-w-[11rem]">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Record</div>
-          <div className="mt-2 text-2xl font-medium tracking-[-0.04em] text-white">
-            {row.record ?? "N/A"}
-          </div>
-        </div>
+        <div className="truncate text-[10px] text-white/32">{formatEventDate(row.eventStart, row.eventEnd)}</div>
       </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard label="np OPR" value={formatNumber(row.npOpr)} />
-        <MetricCard label="Auto OPR" value={formatNumber(row.autoOpr)} />
-        <MetricCard label="Teleop OPR" value={formatNumber(row.teleopOpr)} />
-        <MetricCard label="np AVG" value={formatNumber(row.npAverage)} />
-        <MetricCard label="Event Rank" value={formatOrdinal(row.eventRank) || "N/A"} />
+      <div className="min-w-0">
+        <div className="truncate text-xs text-white/62">{row.eventName}</div>
       </div>
-    </article>
+      <span className="tabular-nums text-right text-white/72">{formatNumber(row.totalNp)}</span>
+      <span className="tabular-nums text-right text-white/72">{formatNumber(row.autoPoints)}</span>
+      <span className="tabular-nums text-right text-white/72">{formatNumber(row.teleopPoints)}</span>
+      <div className="min-w-0 text-xs text-white/46 truncate">
+        {[row.teamOneNumber, row.teamTwoNumber].filter(Boolean).join(" · ")}
+      </div>
+    </div>
   );
 }
 
-function MatchRowCard({
-  row,
-  rankMode,
-}: {
-  row: MatchSeasonRecordRow;
-  rankMode: SeasonRankMode;
-}) {
-  const display = displayRank(row, rankMode);
-
+function TableHeader({ cols }: { cols: string[] }) {
   return (
-    <article className="rounded-[12px] border border-white/10 bg-[#101010] p-4 sm:p-5">
-      <div className="flex flex-col gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            {display ? (
-              <div className="rounded-[8px] border border-white/10 bg-[#0b0b0b] px-3 py-2 text-sm uppercase tracking-[0.12em] text-white/72">
-                {display}
-              </div>
-            ) : null}
-            <div className="rounded-[8px] border border-white/10 bg-[#0b0b0b] px-3 py-2 text-sm uppercase tracking-[0.12em] text-white/72">
-              {row.matchLabel}
-            </div>
-            {row.alliance ? (
-              <div className="rounded-[8px] border border-white/10 bg-[#0b0b0b] px-3 py-2 text-sm uppercase tracking-[0.12em] text-white/72">
-                {row.alliance}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="mt-4">
-            <div className="text-base text-white">{row.eventName}</div>
-            <div className="mt-1 text-sm italic text-white/48">
-              {formatEventDate(row.eventStart, row.eventEnd)}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <MetricCard label="Total NP" value={formatNumber(row.totalNp)} />
-          <MetricCard label="Auto" value={formatNumber(row.autoPoints)} />
-          <MetricCard label="Teleop" value={formatNumber(row.teleopPoints)} />
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-2">
-          <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3">
-            <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Team 1</div>
-            <div className="mt-2 text-lg text-white">{row.teamOneNumber ?? "N/A"}</div>
-            <div className="text-base italic text-white/72">{row.teamOneName ?? "Unknown team"}</div>
-          </div>
-          <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3">
-            <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Team 2</div>
-            <div className="mt-2 text-lg text-white">{row.teamTwoNumber ?? "N/A"}</div>
-            <div className="text-base italic text-white/72">{row.teamTwoName ?? "Unknown team"}</div>
-          </div>
-        </div>
-      </div>
-    </article>
+    <div className={`grid items-center gap-x-4 px-3 pb-1.5 text-[10px] uppercase tracking-[0.1em] text-white/28 ${cols.length === 8 ? "grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.4fr)_5rem_5rem_5rem_5rem_4rem]" : "grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.6fr)_5rem_5rem_5rem_minmax(0,1fr)]"}`}>
+      {cols.map((col) => (
+        <span key={col} className={col !== "Rank" && col !== "Team" && col !== "Event" && col !== "Match" && col !== "Teams" ? "text-right" : ""}>{col}</span>
+      ))}
+    </div>
   );
 }
 
-function TeamRecordsTable({
-  rows,
-  rankMode,
-}: {
-  rows: TeamSeasonRecordRow[];
-  rankMode: SeasonRankMode;
-}) {
+function TeamRecordsTable({ rows, pageOffset }: { rows: TeamSeasonRecordRow[]; pageOffset: number }) {
   return (
-    <div className="space-y-3">
+    <div>
+      <TableHeader cols={["Rank", "Team", "Event", "np OPR", "Auto", "Teleop", "np Avg", "Ev Rank"]} />
       {rows.length === 0 ? (
-        <div className="rounded-[12px] border border-white/10 bg-[#101010] px-4 py-8 text-center text-base text-white/52">
-          No team records matched these filters.
+        <div className="rounded-[8px] border border-white/8 bg-[#101010] px-4 py-6 text-center text-sm text-white/40">
+          No records matched these filters.
         </div>
       ) : (
-        rows.map((row, index) => (
-          <TeamRowCard
-            key={`${row.eventCode ?? "event"}:${row.teamNumber ?? "team"}:${index}`}
-            row={row}
-            rankMode={rankMode}
-          />
-        ))
+        <div className="space-y-1">
+          {rows.map((row, index) => (
+            <TeamRecordRow
+              key={`${row.eventCode ?? "event"}:${row.teamNumber ?? "team"}:${index}`}
+              row={row}
+              rank={pageOffset + index + 1}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-function MatchRecordsTable({
-  rows,
-  rankMode,
-}: {
-  rows: MatchSeasonRecordRow[];
-  rankMode: SeasonRankMode;
-}) {
+function MatchRecordsTable({ rows, pageOffset }: { rows: MatchSeasonRecordRow[]; pageOffset: number }) {
   return (
-    <div className="space-y-3">
+    <div>
+      <TableHeader cols={["Rank", "Match", "Event", "Total NP", "Auto", "Teleop", "Teams"]} />
       {rows.length === 0 ? (
-        <div className="rounded-[12px] border border-white/10 bg-[#101010] px-4 py-8 text-center text-base text-white/52">
-          No match records matched these filters.
+        <div className="rounded-[8px] border border-white/8 bg-[#101010] px-4 py-6 text-center text-sm text-white/40">
+          No records matched these filters.
         </div>
       ) : (
-        rows.map((row, index) => (
-          <MatchRowCard
-            key={`${row.eventCode ?? "event"}:${row.matchLabel}:${row.alliance ?? "alliance"}:${index}`}
-            row={row}
-            rankMode={rankMode}
-          />
-        ))
+        <div className="space-y-1">
+          {rows.map((row, index) => (
+            <MatchRecordRow
+              key={`${row.eventCode ?? "event"}:${row.matchLabel}:${row.alliance ?? "alliance"}:${index}`}
+              row={row}
+              rank={pageOffset + index + 1}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -412,6 +331,10 @@ export default async function SeasonRecordsPage(props: PageProps<"/season-record
     typeof searchParams.endDate === "string" && isDateInput(searchParams.endDate)
       ? searchParams.endDate
       : "";
+  const page =
+    typeof searchParams.page === "string" && /^\d+$/.test(searchParams.page)
+      ? Math.max(1, Number(searchParams.page))
+      : 1;
 
   const [records, eventsResponse, selectedSeasonSummary] = await Promise.all([
     getSeasonRecords(requestedSeason, view),
@@ -465,6 +388,11 @@ export default async function SeasonRecordsPage(props: PageProps<"/season-record
           ),
         );
 
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageOffset = (safePage - 1) * PAGE_SIZE;
+  const pagedRows = sortedRows.slice(pageOffset, pageOffset + PAGE_SIZE);
+
   const seasonOptions = buildSeasonOptions(currentSeason);
   const heading = `${formatSeasonLabel(requestedSeason)} Season Records`;
   const queryString = createQueryString(
@@ -477,18 +405,21 @@ export default async function SeasonRecordsPage(props: PageProps<"/season-record
     endDate,
     sort,
   );
+
+  function pageUrl(p: number) {
+    return `/season-records?${createQueryString(requestedSeason, view, rankMode, region, eventType, startDate, endDate, sort, p)}`;
+  }
   const hydrationSafeProps = { suppressHydrationWarning: true };
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
-      <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
-        <section className="rounded-[14px] border border-white/10 bg-[#090909] p-6">
-          <div className="text-[11px] uppercase tracking-[0.22em] text-white/34">Season Records</div>
-          <h1 className="mt-3 text-4xl font-medium tracking-[-0.08em] text-white sm:text-5xl">
+      <div className="mx-auto max-w-6xl px-5 py-4 sm:px-8 sm:py-6">
+        <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
+          <h1 className="text-2xl font-medium tracking-[-0.05em] text-white sm:text-3xl">
             {heading}
           </h1>
 
-          <form className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <form className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <input type="hidden" name="view" value={view} />
             <input type="hidden" name="rank" value={rankMode} />
             <input type="hidden" name="sort" value={sort} />
@@ -615,7 +546,7 @@ export default async function SeasonRecordsPage(props: PageProps<"/season-record
             </div>
 
             <div className="text-sm text-white/48">
-              Showing {sortedRows.length} of {records.count.toLocaleString()} rows
+              {sortedRows.length.toLocaleString()} results
             </div>
           </div>
 
@@ -684,13 +615,65 @@ export default async function SeasonRecordsPage(props: PageProps<"/season-record
             </a>
           </form>
 
-          <div className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] p-3">
+          <div className="mt-4">
             {view === "teams" ? (
-              <TeamRecordsTable rows={sortedRows as TeamSeasonRecordRow[]} rankMode={rankMode} />
+              <TeamRecordsTable rows={pagedRows as TeamSeasonRecordRow[]} pageOffset={pageOffset} />
             ) : (
-              <MatchRecordsTable rows={sortedRows as MatchSeasonRecordRow[]} rankMode={rankMode} />
+              <MatchRecordsTable rows={pagedRows as MatchSeasonRecordRow[]} pageOffset={pageOffset} />
             )}
           </div>
+
+          {totalPages > 1 ? (
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <div className="text-sm text-white/40">
+                Page {safePage} of {totalPages} · {sortedRows.length.toLocaleString()} results
+              </div>
+              <div className="flex items-center gap-1">
+                {safePage > 1 ? (
+                  <Link
+                    href={pageUrl(safePage - 1)}
+                    className="rounded-[8px] border border-white/10 bg-[#111111] px-3 py-1.5 text-sm text-white/70 hover:text-white"
+                  >
+                    ← Prev
+                  </Link>
+                ) : null}
+                {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+                  let p: number;
+                  if (totalPages <= 7) {
+                    p = i + 1;
+                  } else if (safePage <= 4) {
+                    p = i + 1;
+                  } else if (safePage >= totalPages - 3) {
+                    p = totalPages - 6 + i;
+                  } else {
+                    p = safePage - 3 + i;
+                  }
+                  return (
+                    <Link
+                      key={p}
+                      href={pageUrl(p)}
+                      className={[
+                        "rounded-[8px] border px-3 py-1.5 text-sm tabular-nums",
+                        p === safePage
+                          ? "border-white/20 bg-white text-black font-medium"
+                          : "border-white/10 bg-[#111111] text-white/60 hover:text-white",
+                      ].join(" ")}
+                    >
+                      {p}
+                    </Link>
+                  );
+                })}
+                {safePage < totalPages ? (
+                  <Link
+                    href={pageUrl(safePage + 1)}
+                    className="rounded-[8px] border border-white/10 bg-[#111111] px-3 py-1.5 text-sm text-white/70 hover:text-white"
+                  >
+                    Next →
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="mt-4 text-sm text-white/42">

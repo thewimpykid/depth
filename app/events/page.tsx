@@ -53,16 +53,9 @@ export default async function EventsPage(props: PageProps<"/events">) {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
-      <div className="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8">
-        <section className="rounded-[14px] border border-white/10 bg-[#090909] p-6">
-          <div className="text-[11px] uppercase tracking-[0.22em] text-white/34">Events</div>
-          <h1 className="mt-3 text-4xl font-medium tracking-[-0.08em] text-white sm:text-5xl">
-            events
-          </h1>
-          <p className="mt-3 max-w-3xl text-base text-white/58 sm:text-lg">
-            Search official FTC events by code, name, city, or venue, then jump into matches or simulation.
-          </p>
-
+      <div className="mx-auto max-w-6xl px-5 py-4 sm:px-8 sm:py-6">
+        <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
+          <h1 className="text-2xl font-medium tracking-[-0.05em] text-white sm:text-3xl">Events</h1>
           <EventSearchForm
             initialQuery={eventQuery}
             initialSeason={season}
@@ -73,59 +66,45 @@ export default async function EventsPage(props: PageProps<"/events">) {
         </section>
 
         {!eventQuery ? (
-          <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-white/52">
+          <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-white/52">
             Start typing an event name or event code to browse events.
           </section>
         ) : results.length === 0 ? (
-          <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-[#ff9c9c]">
+          <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#ff9c9c]">
             No published events matched that search.
           </section>
         ) : (
-          <section className="mt-6 grid gap-4 xl:grid-cols-2">
+          <section className="mt-4 grid gap-3 xl:grid-cols-2">
             {results.map((event) => (
-              <article key={event.code} className="rounded-[14px] border border-white/10 bg-[#090909] p-5 sm:p-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
+              <article key={event.code} className="rounded-[10px] border border-white/10 bg-[#090909] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Link
                       href={`/matches?season=${season}&eventCode=${encodeURIComponent(event.code)}&eventQuery=${encodeURIComponent(event.name)}`}
-                      className="group w-fit"
+                      className="text-base font-medium text-white hover:text-white/80"
                     >
-                      <div className="text-3xl font-medium tracking-[-0.05em] text-white underline-offset-4 group-hover:underline">
-                        {event.name}
-                      </div>
+                      {event.name}
                     </Link>
-                    <div className="mt-2 text-sm uppercase tracking-[0.14em] text-white/38">
-                      {event.code}
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-white/42">
+                      <span className="uppercase tracking-[0.1em]">{event.code}</span>
+                      <span>{fmtDateRange(event.start, event.end)}</span>
+                      {event.location ? <span className="italic">{event.location}</span> : null}
                     </div>
                   </div>
-                  <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-white/72">
-                    {season}
-                  </div>
+                  <span className="shrink-0 rounded-[6px] border border-white/10 bg-[#111111] px-2 py-1 text-[10px] text-white/50">{season}</span>
                 </div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
-                    <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Date</div>
-                    <div className="mt-2 text-base text-white/84">{fmtDateRange(event.start, event.end)}</div>
-                  </div>
-                  <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
-                    <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Location</div>
-                    <div className="mt-2 text-base text-white/84">{event.location ?? "Location unavailable"}</div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <Link
                     href={`/matches?season=${season}&eventCode=${encodeURIComponent(event.code)}&eventQuery=${encodeURIComponent(event.name)}`}
-                    className="rounded-[10px] border border-white/10 bg-white px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-black"
+                    className="rounded-[8px] border border-white/10 bg-white px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-black"
                   >
-                    Open matches
+                    Matches
                   </Link>
                   <Link
                     href={`/simulate?season=${season}&eventCode=${encodeURIComponent(event.code)}&eventQuery=${encodeURIComponent(event.name)}&runs=300`}
-                    className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-white/78"
+                    className="rounded-[8px] border border-white/10 bg-[#111111] px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white/70"
                   >
-                    Simulate event
+                    Simulate
                   </Link>
                 </div>
               </article>
