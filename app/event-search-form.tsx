@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, startTransition, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import SmartSearchInput from "./smart-search-input";
@@ -27,7 +27,7 @@ export default function EventSearchForm({
   const [eventCode, setEventCode] = useState(initialCode ?? "");
   const [season, setSeason] = useState(String(initialSeason));
   const [error, setError] = useState<string | null>(null);
-  const [isPending, setIsPending] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const currentUrl = useMemo(() => {
     const queryString = searchParams?.toString();
@@ -45,12 +45,8 @@ export default function EventSearchForm({
 
     const nextUrl = `${basePath}?season=${encodeURIComponent(season)}&eventQuery=${encodeURIComponent(trimmed)}${eventCode ? `&eventCode=${encodeURIComponent(eventCode)}` : ""}`;
     setError(null);
-    setIsPending(true);
 
-    if (nextUrl === currentUrl) {
-      setIsPending(false);
-      return;
-    }
+    if (nextUrl === currentUrl) return;
 
     startTransition(() => {
       router.push(nextUrl);

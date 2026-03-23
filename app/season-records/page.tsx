@@ -694,7 +694,7 @@ export default async function SeasonRecordsPage(props: PageProps<"/season-record
         </section>
 
         <section className="mt-4 text-sm text-white/42">
-          Source: FTCScout records data for {requestedSeason} {selectedSeasonSummary.gameName ?? formatSeasonLabel(requestedSeason)}.
+          FTC data for {requestedSeason} {selectedSeasonSummary.gameName ?? formatSeasonLabel(requestedSeason)}.
         </section>
       </div>
     </main>

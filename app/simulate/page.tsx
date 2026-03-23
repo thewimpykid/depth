@@ -4,6 +4,7 @@ import SimulateControls from "./simulate-controls";
 import { getCurrentSeasonWithOptions } from "@/lib/team-analysis";
 import {
   simulateActualEvent,
+  simulateRandomScheduleEvent,
   type ActualEventMatch,
   type ActualEventStanding,
   searchSeasonEvents,
@@ -68,9 +69,9 @@ function SummaryCard({
   value: string;
 }) {
   return (
-    <article className="rounded-[12px] border border-white/10 bg-[#090909] p-5">
-      <div className="text-[11px] uppercase tracking-[0.14em] text-white/36">{label}</div>
-      <div className="mt-3 text-4xl font-medium tracking-[-0.06em] text-white">{value}</div>
+    <article className="rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3">
+      <div className="text-[10px] uppercase tracking-[0.14em] text-white/36">{label}</div>
+      <div className="mt-1.5 text-2xl font-medium tracking-[-0.04em] text-white">{value}</div>
     </article>
   );
 }
@@ -135,167 +136,148 @@ function TeamStrengthChart({
   );
 }
 
-function StandingCard({
-  row,
-  season,
-  index,
+function StatPill({
+  label,
+  value,
+  highlight,
 }: {
-  row: ActualEventStanding;
-  season: number;
-  index: number;
-}) {
-  return (
-    <article className="rounded-[12px] border border-white/10 bg-[#101010] p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-[8px] border border-white/10 bg-[#0b0b0b] px-3 py-2 text-sm uppercase tracking-[0.12em] text-white/72">
-              #{index + 1}
-            </div>
-            <div>
-              <div className="text-2xl font-medium tracking-[-0.04em] text-white">
-                {row.teamNumber}
-                {row.name ? ` - ${row.name}` : ""}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <Link
-          href={`/teams?q=${row.teamNumber}&season=${season}`}
-          className="rounded-[10px] border border-white/10 bg-[#0b0b0b] px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-white/72"
-        >
-          Open team
-        </Link>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Expected Record</div>
-          <div className="mt-2 text-base text-white/86">
-            {row.expectedWins.toFixed(2)} - {row.expectedLosses.toFixed(2)} - {row.expectedTies.toFixed(2)}
-          </div>
-        </div>
-        <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Locked Record</div>
-          <div className="mt-2 text-base text-white/86">
-            {row.lockedWins} - {row.lockedLosses} - {row.lockedTies}
-          </div>
-        </div>
-        <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Average Seed</div>
-          <div className="mt-2 text-base text-white/86">{row.averageSeed.toFixed(2)}</div>
-        </div>
-        <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">1 Seed Chance</div>
-          <div className="mt-2 text-base text-white/86">{formatProbability(row.firstSeedProbability)}</div>
-        </div>
-        <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Top 4 Chance</div>
-          <div className="mt-2 text-base text-white/86">{formatProbability(row.topFourProbability)}</div>
-        </div>
-        <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Avg Score For</div>
-          <div className="mt-2 text-base text-white/86">{formatValue(row.averageScoreFor)}</div>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function AlliancePanel({
-  tone,
-  winProbability,
-  predictedScore,
-  actualScore,
-  teams,
-}: {
-  tone: "red" | "blue";
-  winProbability: number;
-  predictedScore: number;
-  actualScore: number | null;
-  teams: ActualEventMatch["redAlliance"];
+  label: string;
+  value: string;
+  highlight?: "gold" | "green";
 }) {
   return (
     <div
       className={[
-        "rounded-[10px] border px-4 py-4",
-        tone === "red" ? "border-[#552222] bg-[#170d0d]" : "border-[#1e3a5f] bg-[#0d1520]",
+        "rounded-[8px] border px-3 py-2",
+        highlight === "gold"
+          ? "border-[#3a2800]/50 bg-[#160f00]"
+          : highlight === "green"
+            ? "border-[#1a3a00]/50 bg-[#0a1400]"
+            : "border-white/8 bg-[#111111]",
       ].join(" ")}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div
-          className={[
-            "text-[11px] uppercase tracking-[0.12em]",
-            tone === "red" ? "text-[#f0b9b9]" : "text-[#bdd5ff]",
-          ].join(" ")}
-        >
-          {tone === "red" ? "Red Alliance" : "Blue Alliance"}
-        </div>
-        <div className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-white/76">
-          {formatProbability(winProbability)}
-        </div>
-      </div>
-
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Projected</div>
-          <div className="mt-2 text-2xl font-medium tracking-[-0.04em] text-white">
-            {formatValue(predictedScore)}
-          </div>
-        </div>
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.12em] text-white/36">Actual</div>
-          <div className="mt-2 text-2xl font-medium tracking-[-0.04em] text-white">
-            {actualScore === null ? "TBD" : String(actualScore)}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-2">
-        {teams.map((team) => (
-          <div key={`${tone}-${team.teamNumber}`} className="rounded-[8px] border border-white/10 bg-black/15 px-3 py-3">
-            <div className="text-base font-medium text-white">{team.teamNumber}</div>
-            <div className="text-sm text-white/72">{team.name ?? "Unknown team"}</div>
-          </div>
-        ))}
+      <div className="text-[9px] uppercase tracking-[0.12em] text-white/34">{label}</div>
+      <div
+        className={[
+          "mt-1 text-sm font-medium",
+          highlight === "gold"
+            ? "text-[#ffd84d]/85"
+            : highlight === "green"
+              ? "text-[#8be800]/85"
+              : "text-white/80",
+        ].join(" ")}
+      >
+        {value}
       </div>
     </div>
   );
 }
 
-function MatchCard({ match }: { match: ActualEventMatch }) {
+function StandingCard({
+  row,
+  season,
+  index,
+  showPlayoffs,
+}: {
+  row: ActualEventStanding;
+  season: number;
+  index: number;
+  showPlayoffs: boolean;
+}) {
   return (
-    <article className="rounded-[12px] border border-white/10 bg-[#090909] p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-white/36">
-            {match.status === "played" ? "Played Match" : "Upcoming Match"}
-          </div>
-          <div className="mt-2 text-2xl font-medium tracking-[-0.04em] text-white">
-            {match.label}
+    <article className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="shrink-0 rounded-[6px] border border-white/10 bg-[#0b0b0b] px-2 py-1 text-xs tabular-nums text-white/54">
+            #{index + 1}
+          </span>
+          <div className="min-w-0">
+            <span className="text-base font-medium text-white">{row.teamNumber}</span>
+            {row.name ? (
+              <span className="ml-2 truncate text-sm text-white/52">{row.name}</span>
+            ) : null}
           </div>
         </div>
-        <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-2 text-sm text-white/76">
-          {match.status === "played" ? "Locked result" : "Simulated outlook"}
-        </div>
+        <Link
+          href={`/teams?q=${row.teamNumber}&season=${season}`}
+          className="shrink-0 text-[10px] uppercase tracking-[0.14em] text-white/36 hover:text-white/60"
+        >
+          Team page →
+        </Link>
       </div>
 
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <AlliancePanel
-          tone="red"
-          winProbability={match.redWinProbability}
-          predictedScore={match.predictedRedScore}
-          actualScore={match.actualRedScore}
-          teams={match.redAlliance}
-        />
-        <AlliancePanel
-          tone="blue"
-          winProbability={match.blueWinProbability}
-          predictedScore={match.predictedBlueScore}
-          actualScore={match.actualBlueScore}
-          teams={match.blueAlliance}
-        />
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <StatPill label="Exp W-L" value={`${row.expectedWins.toFixed(1)}-${row.expectedLosses.toFixed(1)}`} />
+        <StatPill label="Avg seed" value={row.averageSeed.toFixed(1)} />
+        <StatPill label="1st seed" value={formatProbability(row.firstSeedProbability)} />
+        <StatPill label="Top 4" value={formatProbability(row.topFourProbability)} />
+        {showPlayoffs ? (
+          <>
+            <StatPill label="Semifinal" value={formatProbability(row.semifinalistProbability + row.finalistProbability + row.championProbability)} />
+            <StatPill label="Finalist" value={formatProbability(row.finalistProbability + row.championProbability)} highlight="gold" />
+            <StatPill label="Champion" value={formatProbability(row.championProbability)} highlight="green" />
+          </>
+        ) : (
+          <>
+            <StatPill label="Locked" value={`${row.lockedWins}-${row.lockedLosses}-${row.lockedTies}`} />
+            <StatPill label="Avg score" value={formatValue(row.averageScoreFor)} />
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function MatchCard({ match, isRandom }: { match: ActualEventMatch; isRandom: boolean }) {
+  const played = !isRandom && match.status === "played";
+  return (
+    <article className="rounded-[10px] border border-white/10 bg-[#0c0c0c] px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className="text-sm font-medium text-white">{match.label}</span>
+          <span className="text-[10px] uppercase tracking-[0.12em] text-white/32">
+            {isRandom ? "sample" : played ? "played" : "upcoming"}
+          </span>
+        </div>
+        {played && match.actualRedScore !== null && match.actualBlueScore !== null ? (
+          <span className="text-xs tabular-nums text-white/50">
+            <span className="text-[#f0b9b9]">{match.actualRedScore}</span>
+            <span className="text-white/24 mx-1">–</span>
+            <span className="text-[#bdd5ff]">{match.actualBlueScore}</span>
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {(["red", "blue"] as const).map((tone) => {
+          const teams = tone === "red" ? match.redAlliance : match.blueAlliance;
+          const prob = tone === "red" ? match.redWinProbability : match.blueWinProbability;
+          const proj = tone === "red" ? match.predictedRedScore : match.predictedBlueScore;
+          return (
+            <div
+              key={tone}
+              className={[
+                "rounded-[8px] border px-3 py-2.5",
+                tone === "red" ? "border-[#552222]/60 bg-[#140a0a]" : "border-[#1e3a5f]/60 bg-[#0a1018]",
+              ].join(" ")}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className={["text-[10px] uppercase tracking-[0.1em]", tone === "red" ? "text-[#f0b9b9]/70" : "text-[#bdd5ff]/70"].join(" ")}>
+                  {tone === "red" ? "Red" : "Blue"}
+                </span>
+                <span className="text-[10px] tabular-nums text-white/46">{formatProbability(prob)}</span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                {teams.map((t) => (
+                  <span key={t.teamNumber} className="text-xs text-white/72">{t.teamNumber}</span>
+                ))}
+              </div>
+              <div className="mt-1.5 text-xs text-white/38">
+                Proj {formatValue(proj)}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </article>
   );
@@ -307,6 +289,8 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
 
   const rawEventQuery = typeof searchParams.eventQuery === "string" ? searchParams.eventQuery : "";
   const rawEventCode = typeof searchParams.eventCode === "string" ? searchParams.eventCode : "";
+  const rawMode = typeof searchParams.mode === "string" ? searchParams.mode : "api";
+  const scheduleMode: "api" | "random" = rawMode === "random" ? "random" : "api";
   const season =
     typeof searchParams.season === "string" && isSeason(searchParams.season)
       ? Number(searchParams.season)
@@ -321,9 +305,15 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
   const eventQuery = rawEventQuery.trim();
   const eventCode = rawEventCode.trim().toUpperCase();
   const eventMatches = eventQuery ? await searchSeasonEvents(season, eventQuery, 12) : [];
+
   const selectedSimulation = eventCode
-    ? await simulateActualEvent(season, eventCode, simulations)
+    ? scheduleMode === "random"
+      ? await simulateRandomScheduleEvent(season, eventCode, simulations)
+      : await simulateActualEvent(season, eventCode, simulations)
     : null;
+
+  const isRandom = selectedSimulation?.scheduleMode === "random";
+  const showPlayoffs = (selectedSimulation?.teams.length ?? 0) >= 4;
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
@@ -334,13 +324,14 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
             simulate an event
           </h1>
           <p className="mt-3 max-w-3xl text-base text-white/58 sm:text-lg">
-            Search a real FTC event, pick it, and simulate the published qualification schedule with current season team strength.
+            Pick an FTC event and simulate qualification matches and playoffs using current season team strength.
           </p>
           <SimulateControls
-            key={`simulate-controls:${season}:${eventQuery}:${eventCode}:${simulations}`}
+            key={`simulate-controls:${season}:${eventQuery}:${eventCode}:${simulations}:${scheduleMode}`}
             initialEventQuery={eventQuery}
             initialSeason={season}
             initialRuns={simulations}
+            initialMode={scheduleMode}
             seasonOptions={seasonOptions}
             matchedEvents={eventMatches}
             selectedEventCode={eventCode}
@@ -365,97 +356,114 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
 
             {selectedSimulation ? (
               <>
-                <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-5 sm:p-6">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
+                <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[11px] uppercase tracking-[0.16em] text-white/34">Selected Event</div>
-                      <div className="mt-3 text-3xl font-medium tracking-[-0.06em] text-white sm:text-4xl">
+                      <div className="text-xl font-medium tracking-[-0.03em] text-white">
                         {selectedSimulation.event.name}
                       </div>
-                      <div className="mt-3 text-base text-white/74">
-                        {fmtDateRange(selectedSimulation.event.start, selectedSimulation.event.end)}
-                      </div>
-                      <div className="mt-1 text-sm italic text-white/48">
-                        {selectedSimulation.event.location ?? "Location unavailable"}
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-white/48">
+                        <span>{fmtDateRange(selectedSimulation.event.start, selectedSimulation.event.end)}</span>
+                        {selectedSimulation.event.location ? <span className="italic">{selectedSimulation.event.location}</span> : null}
                       </div>
                     </div>
-
-                    <div className="rounded-[10px] border border-white/10 bg-[#111111] px-4 py-3 text-sm text-white/72">
-                      Event code {selectedSimulation.event.code}
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-[8px] border border-white/10 bg-[#111111] px-3 py-1.5 text-xs text-white/60">
+                        {selectedSimulation.event.code}
+                      </span>
+                      <span className={[
+                        "rounded-[8px] border px-3 py-1.5 text-[10px] uppercase tracking-[0.1em]",
+                        isRandom
+                          ? "border-violet-500/25 bg-violet-950/30 text-violet-300/70"
+                          : "border-sky-500/25 bg-sky-950/30 text-sky-300/70",
+                      ].join(" ")}>
+                        {isRandom ? "Random" : "Published"}
+                      </span>
                     </div>
                   </div>
                 </section>
 
-                <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <section className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <SummaryCard label="Teams" value={String(selectedSimulation.teams.length)} />
-                  <SummaryCard label="Published Quals" value={String(selectedSimulation.totalQualMatches)} />
-                  <SummaryCard label="Played Quals" value={String(selectedSimulation.playedQualMatches)} />
-                  <SummaryCard label="Remaining Quals" value={String(selectedSimulation.remainingQualMatches)} />
+                  <SummaryCard
+                    label={isRandom ? "Sample quals" : "Published quals"}
+                    value={String(selectedSimulation.totalQualMatches)}
+                  />
+                  {isRandom ? (
+                    <>
+                      <SummaryCard label="Runs" value={selectedSimulation.simulations.toLocaleString()} />
+                      <SummaryCard label="Schedule" value="Random" />
+                    </>
+                  ) : (
+                    <>
+                      <SummaryCard label="Played" value={String(selectedSimulation.playedQualMatches)} />
+                      <SummaryCard label="Remaining" value={String(selectedSimulation.remainingQualMatches)} />
+                    </>
+                  )}
                 </section>
 
-                {selectedSimulation.totalQualMatches === 0 ? (
-                  <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-8 text-base text-white/52">
-                    This event does not have a published qualification schedule yet, so there is nothing to simulate right now.
+                {!isRandom && selectedSimulation.totalQualMatches === 0 ? (
+                  <section className="mt-4 rounded-[10px] border border-white/10 bg-[#090909] px-4 py-3 text-sm text-white/52">
+                    No published schedule yet — switch to <span className="text-violet-300">Random Schedule</span> mode to simulate with a randomly generated schedule.
                   </section>
                 ) : null}
 
-                {selectedSimulation.totalQualMatches > 0 ? (
+                {(isRandom || selectedSimulation.totalQualMatches > 0) ? (
                   <>
-                    <section className="mt-6 grid gap-4 2xl:grid-cols-[1.2fr_0.9fr]">
-                      <div className="rounded-[14px] border border-white/10 bg-[#090909] p-5 sm:p-6">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="text-2xl font-medium tracking-[-0.04em] text-white">
+                    <section className="mt-4 grid gap-4 2xl:grid-cols-[1.2fr_0.9fr]">
+                      <div className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                          <div className="text-lg font-medium tracking-[-0.03em] text-white">
                             Projected Standings
                           </div>
-                          <div className="text-sm text-white/46">
+                          <div className="text-xs text-white/40">
                             {selectedSimulation.simulations.toLocaleString()} runs
                           </div>
                         </div>
-                        <div className="mt-4 space-y-3">
+                        <div className="space-y-2">
                           {selectedSimulation.standings.map((row, index) => (
                             <StandingCard
                               key={`standing-${row.teamNumber}`}
                               row={row}
                               season={season}
                               index={index}
+                              showPlayoffs={showPlayoffs}
                             />
                           ))}
                         </div>
                       </div>
 
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         <TeamStrengthChart rows={selectedSimulation.standings} />
-                        <section className="rounded-[14px] border border-white/10 bg-[#090909] p-5">
-                          <div className="text-2xl font-medium tracking-[-0.04em] text-white">
-                            Model Notes
-                          </div>
-                          <div className="mt-4 space-y-3 text-sm text-white/68">
-                            <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-4">
-                              Strength comes from current season Total NP quick stats when published.
-                            </div>
-                            <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-4">
-                              Already-played qualification matches stay fixed in every run.
-                            </div>
-                            <div className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-4">
-                              Remaining qualification matches are simulated from the real published event schedule.
-                            </div>
+                        <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
+                          <div className="text-base font-medium text-white">Model notes</div>
+                          <div className="mt-2 space-y-1.5 text-xs text-white/54">
+                            <div>Strength = current season Total NP from FTC match data.</div>
+                            {isRandom ? (
+                              <div className="text-violet-300/70">Each run uses a freshly shuffled schedule — no draw bias. Matches shown are one sample for reference.</div>
+                            ) : (
+                              <div>Played quals stay fixed; remaining use the published FTC schedule.</div>
+                            )}
+                            {showPlayoffs && (
+                              <div>Playoffs: top 4 seeds pick partners (greedy), semis 1v4 &amp; 2v3, then finals — all best-of-3.</div>
+                            )}
                           </div>
                         </section>
                       </div>
                     </section>
 
-                    <section className="mt-6 rounded-[14px] border border-white/10 bg-[#090909] p-5 sm:p-6">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="text-2xl font-medium tracking-[-0.04em] text-white">
-                          Qualification Matches
+                    <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <div className="text-lg font-medium tracking-[-0.03em] text-white">
+                          {isRandom ? "Sample Schedule" : "Qualification Matches"}
                         </div>
-                        <div className="text-sm text-white/46">
-                          Played results plus projected outlook for the remaining schedule
+                        <div className="text-xs text-white/40">
+                          {isRandom ? "One possible draw" : "Played + projected remaining"}
                         </div>
                       </div>
-                      <div className="mt-4 grid gap-4 2xl:grid-cols-2">
+                      <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-3">
                         {selectedSimulation.matches.map((match) => (
-                          <MatchCard key={match.key} match={match} />
+                          <MatchCard key={match.key} match={match} isRandom={isRandom} />
                         ))}
                       </div>
                     </section>

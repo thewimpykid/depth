@@ -89,7 +89,6 @@ export default function SmartSearchInput({
 
     fetch(
       `/api/search?q=${encodeURIComponent(debouncedValue)}&scope=${encodeURIComponent(scope)}&season=${encodeURIComponent(String(season))}&limit=8`,
-      { cache: "force-cache" },
     )
       .then(async (response) => {
         if (!response.ok) throw new Error("Search failed");
@@ -226,7 +225,7 @@ export default function SmartSearchInput({
       {showDropdown ? (
         <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 rounded-[12px] border border-white/10 bg-[#0c0c0c] p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.7)]">
           {suggestions.length > 0 ? (
-            <div className="grid gap-0.5">
+            <div className="grid gap-0.5 max-h-[320px] overflow-y-auto">
               {suggestions.map((suggestion, index) => (
                 <button
                   key={suggestion.key}

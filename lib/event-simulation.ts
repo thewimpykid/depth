@@ -49,6 +49,9 @@ export type ActualEventStanding = {
   lockedWins: number;
   lockedLosses: number;
   lockedTies: number;
+  championProbability: number;
+  finalistProbability: number;
+  semifinalistProbability: number;
 };
 
 export type ActualEventSimulationResult = {
@@ -61,6 +64,7 @@ export type ActualEventSimulationResult = {
   totalQualMatches: number;
   playedQualMatches: number;
   remainingQualMatches: number;
+  scheduleMode: "api" | "random";
 };
 
 type TeamProfile = {
@@ -411,6 +415,89 @@ function sortStandings(rows: WorkingStanding[]) {
   });
 }
 
+function buildRandomQualPairings(
+  teams: TeamSnapshot[],
+  rounds: number,
+  rng: () => number,
+): Array<{ red: TeamSnapshot[]; blue: TeamSnapshot[] }> {
+  const matches: Array<{ red: TeamSnapshot[]; blue: TeamSnapshot[] }> = [];
+  for (let round = 0; round < rounds; round++) {
+    const shuffled = [...teams];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    for (let i = 0; i + 3 < shuffled.length; i += 4) {
+      matches.push({ red: [shuffled[i], shuffled[i + 1]], blue: [shuffled[i + 2], shuffled[i + 3]] });
+    }
+  }
+  return matches;
+}
+
+function simulatePlayoffs(
+  ordered: WorkingStanding[],
+  strengthByTeam: Map<number, TeamSnapshot>,
+  fallbackStrength: number,
+  gaussian: (mean: number, stdDev: number) => number,
+  scoreStdDev: number,
+): Map<number, "champion" | "finalist" | "semifinalist"> {
+  if (ordered.length < 4) return new Map();
+
+  const captainNums = ordered.slice(0, 4).map((r) => r.teamNumber);
+  const pickedSet = new Set(captainNums);
+
+  const available = ordered
+    .slice(4)
+    .slice()
+    .sort((a, b) => {
+      const sa = strengthByTeam.get(a.teamNumber)?.strength ?? fallbackStrength;
+      const sb = strengthByTeam.get(b.teamNumber)?.strength ?? fallbackStrength;
+      return sb - sa;
+    });
+
+  const alliances: Array<{ teams: number[]; strength: number }> = captainNums.map((num) => ({
+    teams: [num],
+    strength: strengthByTeam.get(num)?.strength ?? fallbackStrength,
+  }));
+
+  let pickIdx = 0;
+  for (const alliance of alliances) {
+    while (pickIdx < available.length && pickedSet.has(available[pickIdx].teamNumber)) pickIdx++;
+    if (pickIdx < available.length) {
+      const partner = available[pickIdx++];
+      alliance.teams.push(partner.teamNumber);
+      alliance.strength += strengthByTeam.get(partner.teamNumber)?.strength ?? fallbackStrength;
+    }
+  }
+
+  // Best-of-3 series (FTC playoff format)
+  function playSeries(aIdx: number, bIdx: number) {
+    let winsA = 0;
+    let winsB = 0;
+    while (winsA < 2 && winsB < 2) {
+      const aScore = Math.max(0, gaussian(alliances[aIdx].strength, scoreStdDev));
+      const bScore = Math.max(0, gaussian(alliances[bIdx].strength, scoreStdDev));
+      if (aScore >= bScore) winsA++; else winsB++;
+    }
+    return winsA >= winsB ? aIdx : bIdx;
+  }
+
+  const semi1Winner = playSeries(0, 3);
+  const semi1Loser = semi1Winner === 0 ? 3 : 0;
+  const semi2Winner = playSeries(1, 2);
+  const semi2Loser = semi2Winner === 1 ? 2 : 1;
+  const finalsWinner = playSeries(semi1Winner, semi2Winner);
+  const finalsLoser = finalsWinner === semi1Winner ? semi2Winner : semi1Winner;
+
+  const results = new Map<number, "champion" | "finalist" | "semifinalist">();
+  for (const n of alliances[finalsWinner].teams) results.set(n, "champion");
+  for (const n of alliances[finalsLoser].teams) results.set(n, "finalist");
+  for (const li of [semi1Loser, semi2Loser]) {
+    for (const n of alliances[li].teams) results.set(n, "semifinalist");
+  }
+  return results;
+}
+
 async function getEventTeamSnapshots(eventCode: string, season: number) {
   const cacheKey = `event-roster:${season}:${eventCode.toUpperCase()}`;
   const cached = cacheManager.get<TeamSnapshot[]>("analysis", cacheKey);
@@ -606,6 +693,9 @@ export async function simulateActualEvent(
       lockedWins: locked?.wins ?? 0,
       lockedLosses: locked?.losses ?? 0,
       lockedTies: locked?.ties ?? 0,
+      championProbability: 0,
+      finalistProbability: 0,
+      semifinalistProbability: 0,
     });
   }
 
@@ -636,6 +726,18 @@ export async function simulateActualEvent(
     }
 
     const ordered = sortStandings([...runStandings.values()]);
+
+    if (teams.length >= 4) {
+      const playoffResults = simulatePlayoffs(ordered, strengthByTeam, fallbackStrength, gaussian, scoreStdDev);
+      for (const [teamNumber, result] of playoffResults) {
+        const summary = summaries.get(teamNumber);
+        if (!summary) continue;
+        if (result === "champion") summary.championProbability += 1;
+        else if (result === "finalist") summary.finalistProbability += 1;
+        else if (result === "semifinalist") summary.semifinalistProbability += 1;
+      }
+    }
+
     ordered.forEach((row, index) => {
       const summary = summaries.get(row.teamNumber);
       if (!summary) return;
@@ -665,6 +767,9 @@ export async function simulateActualEvent(
       firstSeedProbability: round((summary.firstSeedProbability / simulations) * 100, 1),
       topFourProbability: round((summary.topFourProbability / simulations) * 100, 1),
       averageScoreFor: round(summary.averageScoreFor / simulations, 2),
+      championProbability: round((summary.championProbability / simulations) * 100, 1),
+      finalistProbability: round((summary.finalistProbability / simulations) * 100, 1),
+      semifinalistProbability: round((summary.semifinalistProbability / simulations) * 100, 1),
     }))
     .sort((a, b) => {
       if (a.averageSeed !== b.averageSeed) return a.averageSeed - b.averageSeed;
@@ -682,5 +787,172 @@ export async function simulateActualEvent(
     totalQualMatches: matches.length,
     playedQualMatches: playedMatches.length,
     remainingQualMatches: remainingMatches.length,
+    scheduleMode: "api",
+  };
+}
+
+export async function simulateRandomScheduleEvent(
+  season: number,
+  eventCode: string,
+  simulations: number,
+): Promise<ActualEventSimulationResult | null> {
+  const [event, teams] = await Promise.all([
+    getSeasonEventByCode(season, eventCode),
+    getEventTeamSnapshots(eventCode, season),
+  ]);
+
+  if (!event || teams.length < 4) return null;
+
+  const strengths = teams
+    .map((t) => t.strength)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const fallbackStrength =
+    strengths.length > 0 ? round(strengths.reduce((s, v) => s + v, 0) / strengths.length, 2) : 80;
+
+  const strengthByTeam = new Map<number, TeamSnapshot>(teams.map((t) => [t.teamNumber, t]));
+  const probabilityScale = Math.max(14, fallbackStrength * 0.28);
+  const scoreStdDev = Math.max(8, fallbackStrength * 0.16);
+
+  const matchesPerRound = Math.floor(teams.length / 4);
+  const rounds = matchesPerRound > 0 ? Math.ceil((teams.length * 5) / (matchesPerRound * 4)) : 5;
+
+  // Build a sample schedule for display (deterministic seed)
+  const sampleRng = createRng(`${season}:${eventCode}:random-sample`);
+  const samplePairings = buildRandomQualPairings(teams, rounds, sampleRng);
+  const sampleMatches: ActualEventMatch[] = samplePairings.map((pairing, idx) => {
+    const redAlliance = pairing.red.map((t) => ({
+      teamNumber: t.teamNumber,
+      name: t.name ?? null,
+      strength: t.strength ?? fallbackStrength,
+    }));
+    const blueAlliance = pairing.blue.map((t) => ({
+      teamNumber: t.teamNumber,
+      name: t.name ?? null,
+      strength: t.strength ?? fallbackStrength,
+    }));
+    const prediction = buildPrediction(redAlliance, blueAlliance, probabilityScale);
+    return {
+      key: `random-${idx + 1}`,
+      matchNumber: idx + 1,
+      label: `Qual ${idx + 1}`,
+      redAlliance,
+      blueAlliance,
+      ...prediction,
+      actualRedScore: null,
+      actualBlueScore: null,
+      status: "upcoming",
+    } satisfies ActualEventMatch;
+  });
+
+  const summaries = new Map<number, ActualEventStanding>();
+  for (const team of teams) {
+    summaries.set(team.teamNumber, {
+      teamNumber: team.teamNumber,
+      name: team.name,
+      strength: team.strength ?? fallbackStrength,
+      averageSeed: 0,
+      expectedWins: 0,
+      expectedLosses: 0,
+      expectedTies: 0,
+      firstSeedProbability: 0,
+      topFourProbability: 0,
+      averageScoreFor: 0,
+      lockedWins: 0,
+      lockedLosses: 0,
+      lockedTies: 0,
+      championProbability: 0,
+      finalistProbability: 0,
+      semifinalistProbability: 0,
+    });
+  }
+
+  const playCutoff = Math.min(4, teams.length);
+
+  for (let run = 0; run < simulations; run++) {
+    const rng = createRng(`${season}:${eventCode}:random:run:${run}`);
+    const gaussian = createGaussianSampler(rng);
+    const runStandings = createWorkingStandings(teams);
+
+    const runPairings = buildRandomQualPairings(teams, rounds, rng);
+    for (const pairing of runPairings) {
+      const redAlliance = pairing.red.map((t) => ({
+        teamNumber: t.teamNumber,
+        name: t.name ?? null,
+        strength: t.strength ?? fallbackStrength,
+      }));
+      const blueAlliance = pairing.blue.map((t) => ({
+        teamNumber: t.teamNumber,
+        name: t.name ?? null,
+        strength: t.strength ?? fallbackStrength,
+      }));
+      const redScore = Math.max(
+        0,
+        gaussian(redAlliance.reduce((s, t) => s + t.strength, 0), scoreStdDev),
+      );
+      const blueScore = Math.max(
+        0,
+        gaussian(blueAlliance.reduce((s, t) => s + t.strength, 0), scoreStdDev),
+      );
+      applyResult(runStandings, redAlliance, round(redScore), round(blueScore));
+      applyResult(runStandings, blueAlliance, round(blueScore), round(redScore));
+    }
+
+    const ordered = sortStandings([...runStandings.values()]);
+
+    if (teams.length >= 4) {
+      const playoffResults = simulatePlayoffs(ordered, strengthByTeam, fallbackStrength, gaussian, scoreStdDev);
+      for (const [teamNumber, result] of playoffResults) {
+        const summary = summaries.get(teamNumber);
+        if (!summary) continue;
+        if (result === "champion") summary.championProbability += 1;
+        else if (result === "finalist") summary.finalistProbability += 1;
+        else if (result === "semifinalist") summary.semifinalistProbability += 1;
+      }
+    }
+
+    ordered.forEach((row, index) => {
+      const summary = summaries.get(row.teamNumber);
+      if (!summary) return;
+      summary.averageSeed += index + 1;
+      summary.expectedWins += row.wins;
+      summary.expectedLosses += row.losses;
+      summary.expectedTies += row.ties;
+      summary.averageScoreFor += row.scoreFor;
+      if (index === 0) summary.firstSeedProbability += 1;
+      if (index < playCutoff) summary.topFourProbability += 1;
+    });
+  }
+
+  const standings = [...summaries.values()]
+    .map((summary) => ({
+      ...summary,
+      averageSeed: round(summary.averageSeed / simulations, 2),
+      expectedWins: round(summary.expectedWins / simulations, 2),
+      expectedLosses: round(summary.expectedLosses / simulations, 2),
+      expectedTies: round(summary.expectedTies / simulations, 2),
+      firstSeedProbability: round((summary.firstSeedProbability / simulations) * 100, 1),
+      topFourProbability: round((summary.topFourProbability / simulations) * 100, 1),
+      averageScoreFor: round(summary.averageScoreFor / simulations, 2),
+      championProbability: round((summary.championProbability / simulations) * 100, 1),
+      finalistProbability: round((summary.finalistProbability / simulations) * 100, 1),
+      semifinalistProbability: round((summary.semifinalistProbability / simulations) * 100, 1),
+    }))
+    .sort((a, b) => {
+      if (a.averageSeed !== b.averageSeed) return a.averageSeed - b.averageSeed;
+      if (b.expectedWins !== a.expectedWins) return b.expectedWins - a.expectedWins;
+      return a.teamNumber - b.teamNumber;
+    });
+
+  return {
+    season,
+    event,
+    teams,
+    matches: sampleMatches,
+    standings,
+    simulations,
+    totalQualMatches: sampleMatches.length,
+    playedQualMatches: 0,
+    remainingQualMatches: sampleMatches.length,
+    scheduleMode: "random",
   };
 }

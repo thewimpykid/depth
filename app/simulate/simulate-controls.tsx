@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, startTransition, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import SmartSearchInput from "../smart-search-input";
@@ -41,6 +41,7 @@ export default function SimulateControls({
   initialEventQuery,
   initialSeason,
   initialRuns,
+  initialMode = "api",
   seasonOptions,
   matchedEvents,
   selectedEventCode,
@@ -48,6 +49,7 @@ export default function SimulateControls({
   initialEventQuery: string;
   initialSeason: number;
   initialRuns: number;
+  initialMode?: "api" | "random";
   seasonOptions: number[];
   matchedEvents: EventSearchResult[];
   selectedEventCode: string;
@@ -58,8 +60,10 @@ export default function SimulateControls({
   const [eventQuery, setEventQuery] = useState(initialEventQuery);
   const [season, setSeason] = useState(String(initialSeason));
   const [runs, setRuns] = useState(String(initialRuns));
-  const [pendingMode, setPendingMode] = useState<"search" | "select" | null>(null);
-  const [pendingEventCode, setPendingEventCode] = useState<string | null>(selectedEventCode || null);
+  const [mode, setMode] = useState<"api" | "random">(initialMode);
+  const [isSearchPending, startSearchTransition] = useTransition();
+  const [isSelectPending, startSelectTransition] = useTransition();
+  const [pendingEventCode, setPendingEventCode] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(selectedEventCode || null);
 
   const currentUrl = useMemo(() => {
@@ -67,38 +71,79 @@ export default function SimulateControls({
     return `${pathname}${query ? `?${query}` : ""}`;
   }, [pathname, searchParams]);
 
-  function goTo(url: string, mode: "search" | "select", eventCode?: string) {
-    if (url === currentUrl) {
-      setPendingMode(null);
-      setPendingEventCode(null);
-      return;
-    }
+  function buildUrl(overrides: { eventCode?: string; mode?: "api" | "random" } = {}) {
+    const resolvedMode = overrides.mode ?? mode;
+    const resolvedEventCode = overrides.eventCode ?? selectedCode ?? "";
+    const base = `/simulate?season=${encodeURIComponent(season)}&eventQuery=${encodeURIComponent(eventQuery.trim())}&runs=${encodeURIComponent(runs || "300")}&mode=${resolvedMode}`;
+    return resolvedEventCode ? `${base}&eventCode=${encodeURIComponent(resolvedEventCode)}` : base;
+  }
 
-    setPendingMode(mode);
-    setPendingEventCode(eventCode ?? null);
-    startTransition(() => {
-      router.push(url);
-    });
+  function goTo(url: string, kind: "search" | "select", eventCode?: string) {
+    if (url === currentUrl) return;
+
+    if (kind === "select") {
+      setPendingEventCode(eventCode ?? null);
+      startSelectTransition(() => {
+        router.push(url);
+      });
+    } else {
+      startSearchTransition(() => {
+        router.push(url);
+      });
+    }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     const query = eventQuery.trim();
-    if (!query) {
-      return;
-    }
+    if (!query) return;
+    goTo(buildUrl(), "search", selectedCode ?? undefined);
+  }
 
-    goTo(
-      `/simulate?season=${encodeURIComponent(season)}&eventQuery=${encodeURIComponent(query)}&runs=${encodeURIComponent(runs || "300")}${selectedCode ? `&eventCode=${encodeURIComponent(selectedCode)}` : ""}`,
-      "search",
-      selectedCode ?? undefined,
-    );
+  function handleModeChange(nextMode: "api" | "random") {
+    setMode(nextMode);
+    if (!selectedCode) return;
+    const url = buildUrl({ mode: nextMode });
+    if (url !== currentUrl) {
+      startSearchTransition(() => {
+        router.push(url);
+      });
+    }
   }
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      {/* Mode toggle */}
+      <div className="mt-5 flex items-center gap-1 rounded-[10px] border border-white/10 bg-[#0b0b0b] p-1 w-fit">
+        <button
+          suppressHydrationWarning
+          type="button"
+          onClick={() => handleModeChange("api")}
+          className={[
+            "rounded-[8px] px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors",
+            mode === "api"
+              ? "bg-white text-black font-semibold"
+              : "text-white/52 hover:text-white/80",
+          ].join(" ")}
+        >
+          API Schedule
+        </button>
+        <button
+          suppressHydrationWarning
+          type="button"
+          onClick={() => handleModeChange("random")}
+          className={[
+            "rounded-[8px] px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors",
+            mode === "random"
+              ? "bg-white text-black font-semibold"
+              : "text-white/52 hover:text-white/80",
+          ].join(" ")}
+        >
+          Random Schedule
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
         <div className="grid gap-3 2xl:grid-cols-[minmax(0,1.8fr)_12rem_12rem_auto] 2xl:items-end">
           <label className="block">
             <div className="mb-2 text-sm text-white/64">Event Search</div>
@@ -155,15 +200,17 @@ export default function SimulateControls({
           <button
             suppressHydrationWarning
             type="submit"
-            disabled={pendingMode !== null}
+            disabled={isSearchPending || isSelectPending}
             className="h-12 rounded-[10px] border border-white/10 bg-white px-5 text-sm font-medium uppercase tracking-[0.18em] text-black disabled:opacity-60"
           >
-            {pendingMode === "search" ? "Searching" : "Search"}
+            {isSearchPending ? "Searching" : "Search"}
           </button>
         </div>
 
         <div className="text-sm text-white/42">
-          Search first, then pick a real event from the results below.
+          {mode === "api"
+            ? "Simulates the published qualification schedule using FTC match data."
+            : "Generates a random schedule each run — shows expected outcomes independent of draw."}
         </div>
       </form>
 
@@ -181,7 +228,7 @@ export default function SimulateControls({
             {matchedEvents.map((event) => {
               const isSelected = selectedEventCode === event.code.toUpperCase();
               const isPendingSelection =
-                pendingMode === "select" && pendingEventCode === event.code.toUpperCase();
+                isSelectPending && pendingEventCode === event.code.toUpperCase();
 
               return (
                 <article
@@ -210,10 +257,10 @@ export default function SimulateControls({
                     <button
                       suppressHydrationWarning
                       type="button"
-                      disabled={pendingMode !== null}
+                      disabled={isSearchPending || isSelectPending}
                       onClick={() =>
                         goTo(
-                          `/simulate?season=${encodeURIComponent(season)}&eventQuery=${encodeURIComponent(eventQuery.trim())}&eventCode=${encodeURIComponent(event.code)}&runs=${encodeURIComponent(runs || "300")}`,
+                          buildUrl({ eventCode: event.code }),
                           "select",
                           event.code.toUpperCase(),
                         )

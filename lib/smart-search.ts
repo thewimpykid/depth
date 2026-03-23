@@ -1,7 +1,7 @@
 import "server-only";
 
 import { ftcApiClient } from "@/lib/ftc-api-client";
-import { ftcScoutApiClient } from "@/lib/ftcscout-api-client";
+import { cacheManager } from "@/lib/cache-manager";
 
 export type SearchScope = "teams" | "events" | "mixed";
 
@@ -116,7 +116,7 @@ function normalizeTeam(raw: unknown): TeamIndexEntry | null {
   const subtitle = formatLocation([
     pickString(obj, ["schoolName"]),
     pickString(obj, ["city"]),
-    pickString(obj, ["state"]),
+    pickString(obj, ["state", "stateProv"]),
     pickString(obj, ["country"]),
   ]);
 
@@ -128,7 +128,7 @@ function normalizeTeam(raw: unknown): TeamIndexEntry | null {
   };
 }
 
-function scoreEntry(haystack: string, exactKey: string, query: string) {
+function scoreEntry(haystack: string, exactKey: string, query: string, secondaryKey?: string) {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return -1;
 
@@ -141,6 +141,10 @@ function scoreEntry(haystack: string, exactKey: string, query: string) {
       score += 14;
     } else if (exactKey.startsWith(token)) {
       score += 10;
+    } else if (secondaryKey && secondaryKey === token) {
+      score += 12;
+    } else if (secondaryKey && secondaryKey.startsWith(token)) {
+      score += 8;
     } else if (haystack.includes(token)) {
       score += 3;
       // Extra boost when token matches the start of any word in the haystack
@@ -159,11 +163,27 @@ function scoreEntry(haystack: string, exactKey: string, query: string) {
   return score;
 }
 
-async function getTeamIndex() {
-  const response = await ftcScoutApiClient.getTeamSearchIndex();
-  return asArray(response.value)
-    .map(normalizeTeam)
-    .filter((team): team is TeamIndexEntry => team !== null);
+async function getTeamIndex(season: number): Promise<TeamIndexEntry[]> {
+  const cacheKey = `team-index-${season}`;
+  const cached = cacheManager.get<TeamIndexEntry[]>("search-index", cacheKey);
+  if (cached !== null) return cached;
+
+  const firstPage = await ftcApiClient.getTeamIndexPage(season, 1);
+  const allTeams: unknown[] = [...asArray(firstPage.teams)];
+  const pageTotal = Math.min(firstPage.pageTotal ?? 1, 200);
+
+  if (pageTotal > 1) {
+    const remaining = await Promise.all(
+      Array.from({ length: pageTotal - 1 }, (_, i) => i + 2).map((p) =>
+        ftcApiClient.getTeamIndexPage(season, p).then((r) => asArray(r.teams)).catch(() => [] as unknown[]),
+      ),
+    );
+    for (const teams of remaining) allTeams.push(...teams);
+  }
+
+  const index = allTeams.map(normalizeTeam).filter((t): t is TeamIndexEntry => t !== null);
+  cacheManager.set("search-index", cacheKey, index, 3600);
+  return index;
 }
 
 async function getEventIndex(season: number) {
@@ -185,9 +205,9 @@ export async function getSearchSuggestions(
   const results: Array<SearchSuggestion & { score: number }> = [];
 
   if (scope === "teams" || scope === "mixed") {
-    const teams = await getTeamIndex();
+    const teams = await getTeamIndex(season);
     for (const team of teams) {
-      const score = scoreEntry(team.haystack, String(team.teamNumber), trimmed);
+      const score = scoreEntry(team.haystack, String(team.teamNumber), trimmed, team.title.toLowerCase());
       if (score < 0) continue;
 
       results.push({

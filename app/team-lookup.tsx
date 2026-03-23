@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, startTransition, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import SmartSearchInput from "./smart-search-input";
@@ -29,7 +29,7 @@ export default function TeamLookupForm({
   const [query, setQuery] = useState(initialValue);
   const [selectedSuggestion, setSelectedSuggestion] = useState<SearchSuggestion | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, setIsPending] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const currentUrl = useMemo(() => {
     const queryString = searchParams?.toString();
@@ -59,17 +59,13 @@ export default function TeamLookupForm({
 
     const nextUrl = navigateTo(selectedSuggestion, query);
     if (!nextUrl) {
-      setError(scope === "mixed" ? "Choose a team or event." : "Enter a valid FTC team search.");
+      setError(scope === "mixed" ? "Choose a team or event from the suggestions." : "Enter a team number or pick a team from the suggestions.");
       return;
     }
 
     setError(null);
-    setIsPending(true);
 
-    if (nextUrl === currentUrl) {
-      setIsPending(false);
-      return;
-    }
+    if (nextUrl === currentUrl) return;
 
     startTransition(() => {
       router.push(nextUrl);
@@ -98,16 +94,11 @@ export default function TeamLookupForm({
           }}
           onPick={(suggestion) => {
             setSelectedSuggestion(suggestion);
-            setQuery(
-              suggestion.type === "team"
-                ? `${suggestion.teamNumber ?? ""}`
-                : suggestion.title,
-            );
+            setQuery(suggestion.title);
             if (error) setError(null);
           }}
           scope={scope}
           season={season ?? new Date().getFullYear()}
-          inputMode={scope === "teams" ? "numeric" : undefined}
           placeholder={
             scope === "mixed"
               ? compact

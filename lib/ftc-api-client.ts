@@ -145,6 +145,16 @@ class FTCApiClient {
     );
   }
 
+  async getTeamIndexPage(season: number, page: number, options?: FetchOptions) {
+    return this.fetchWithCache<TeamListResponse>(
+      `/${season}/teams?page=${page}`,
+      "teams-index",
+      `all-teams-${season}-page-${page}`,
+      3600,
+      options,
+    );
+  }
+
   async getEventTeams(eventCode: string, season?: number, options?: FetchOptions) {
     const requestedSeason = await this.getRequestedSeason(season);
     const firstPage = await this.fetchWithCache<TeamListResponse>(

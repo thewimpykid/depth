@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, startTransition, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import SmartSearchInput from "../smart-search-input";
@@ -39,7 +39,7 @@ export default function CompareBuilderForm({
   const [teams, setTeams] = useState<string[]>(() => buildInitialSlots(initialTeams));
   const [season, setSeason] = useState(String(initialSeason));
   const [error, setError] = useState<string | null>(null);
-  const [isPending, setIsPending] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const currentUrl = useMemo(() => {
     const query = searchParams?.toString();
@@ -67,13 +67,9 @@ export default function CompareBuilderForm({
     }
 
     setError(null);
-    setIsPending(true);
 
     const nextUrl = `/compare?season=${encodeURIComponent(season)}&teams=${encodeURIComponent(uniqueTeams.join(","))}`;
-    if (nextUrl === currentUrl) {
-      setIsPending(false);
-      return;
-    }
+    if (nextUrl === currentUrl) return;
 
     startTransition(() => {
       router.push(nextUrl);
@@ -103,7 +99,6 @@ export default function CompareBuilderForm({
                 }}
                 scope="teams"
                 season={Number(season)}
-                inputMode="numeric"
                 placeholder="Team number or name"
                 containerClassName="h-12 min-w-0 flex-1 rounded-[10px] border border-white/10 bg-[#111111] text-base focus-within:border-white/25"
               />
