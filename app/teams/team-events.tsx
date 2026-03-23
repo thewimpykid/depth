@@ -11,7 +11,7 @@ import type {
   TeamMatch,
 } from "@/lib/ftc";
 
-const EVENT_DETAILS_SCHEMA_VERSION = "7";
+const EVENT_DETAILS_SCHEMA_VERSION = "8";
 const eventDetailsCache = new Map<string, TeamEventDetails>();
 
 function fmtDateRange(start: string | null | undefined, end: string | null | undefined) {

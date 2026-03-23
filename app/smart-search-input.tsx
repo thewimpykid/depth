@@ -51,6 +51,7 @@ export default function SmartSearchInput({
   value,
   onChange,
   onPick,
+  onSuggestionsChange,
   scope,
   season,
   placeholder,
@@ -61,6 +62,7 @@ export default function SmartSearchInput({
   value: string;
   onChange: (value: string) => void;
   onPick: (suggestion: SearchSuggestion) => void;
+  onSuggestionsChange?: (suggestions: SearchSuggestion[]) => void;
   scope: SearchScope;
   season: number;
   placeholder: string;
@@ -98,6 +100,7 @@ export default function SmartSearchInput({
         if (requestId.current !== currentRequest) return;
         const next = Array.isArray(payload.suggestions) ? payload.suggestions : [];
         setSuggestions(next);
+        onSuggestionsChange?.(next);
         setOpen(true);
         setActiveIndex(next.length > 0 ? 0 : -1);
         setSearched(true);
@@ -234,29 +237,31 @@ export default function SmartSearchInput({
                   onClick={() => applySuggestion(suggestion)}
                   onMouseEnter={() => setActiveIndex(index)}
                   className={[
-                    "flex w-full items-start gap-2.5 rounded-[9px] border px-3 py-2.5 text-left transition-colors",
+                    "flex w-full items-center gap-3 rounded-[9px] border px-3 py-2.5 text-left transition-colors",
                     index === activeIndex
                       ? "border-white/10 bg-[#181818]"
                       : "border-transparent hover:bg-[#141414]",
                   ].join(" ")}
                 >
-                  <TypeBadge type={suggestion.type} />
+                  {suggestion.type === "team" && suggestion.teamNumber ? (
+                    <span className="w-12 shrink-0 text-right font-mono text-sm font-semibold tabular-nums text-white/70">
+                      {suggestion.teamNumber}
+                    </span>
+                  ) : (
+                    <TypeBadge type={suggestion.type} />
+                  )}
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium leading-snug text-white">
+                    <div className="truncate text-sm leading-snug text-white/90">
                       {suggestion.title}
                     </div>
                     {suggestion.subtitle ? (
-                      <div className="mt-0.5 truncate text-xs leading-snug text-white/42">
+                      <div className="mt-0.5 truncate text-xs leading-snug text-white/38">
                         {suggestion.subtitle}
                       </div>
                     ) : null}
                   </div>
-                  {suggestion.type === "team" && suggestion.teamNumber ? (
-                    <span className="shrink-0 self-center font-mono text-xs tabular-nums text-white/28">
-                      {suggestion.teamNumber}
-                    </span>
-                  ) : suggestion.type === "event" && suggestion.eventCode ? (
-                    <span className="shrink-0 self-center font-mono text-xs tabular-nums text-white/28">
+                  {suggestion.type === "event" && suggestion.eventCode ? (
+                    <span className="shrink-0 font-mono text-xs tabular-nums text-white/35">
                       {suggestion.eventCode}
                     </span>
                   ) : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState, useTransition } from "react";
+import { FormEvent, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import SmartSearchInput from "./smart-search-input";
@@ -28,6 +28,7 @@ export default function TeamLookupForm({
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(initialValue);
   const [selectedSuggestion, setSelectedSuggestion] = useState<SearchSuggestion | null>(null);
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -54,22 +55,51 @@ export default function TeamLookupForm({
     return null;
   }
 
+  function goTo(url: string) {
+    setError(null);
+    if (url === currentUrl) return;
+    startTransition(() => router.push(url));
+  }
+
+  function handlePick(suggestion: SearchSuggestion) {
+    setSelectedSuggestion(suggestion);
+    setQuery(suggestion.title);
+    if (error) setError(null);
+    const url = navigateTo(suggestion, suggestion.title);
+    if (url) goTo(url);
+  }
+
+  // Auto-navigate when the typed query is an exact team number match
+  const prevAutoQuery = useRef("");
+  function handleSuggestionsChange(next: SearchSuggestion[]) {
+    setSuggestions(next);
+    if (
+      scope === "teams" &&
+      /^\d{4,5}$/.test(query.trim()) &&
+      query.trim() !== prevAutoQuery.current &&
+      next.length > 0 &&
+      next[0].type === "team" &&
+      next[0].teamNumber === Number(query.trim())
+    ) {
+      prevAutoQuery.current = query.trim();
+      const url = navigateTo(next[0], query.trim());
+      if (url) goTo(url);
+    }
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const nextUrl = navigateTo(selectedSuggestion, query);
+    // If no suggestion selected but there's exactly one result, auto-pick it
+    const activeSuggestion = selectedSuggestion ?? (suggestions.length === 1 ? suggestions[0] : null);
+
+    const nextUrl = navigateTo(activeSuggestion, query);
     if (!nextUrl) {
       setError(scope === "mixed" ? "Choose a team or event from the suggestions." : "Enter a team number or pick a team from the suggestions.");
       return;
     }
 
-    setError(null);
-
-    if (nextUrl === currentUrl) return;
-
-    startTransition(() => {
-      router.push(nextUrl);
-    });
+    goTo(nextUrl);
   }
 
   return (
@@ -92,11 +122,8 @@ export default function TeamLookupForm({
             setSelectedSuggestion(null);
             if (error) setError(null);
           }}
-          onPick={(suggestion) => {
-            setSelectedSuggestion(suggestion);
-            setQuery(suggestion.title);
-            if (error) setError(null);
-          }}
+          onPick={handlePick}
+          onSuggestionsChange={handleSuggestionsChange}
           scope={scope}
           season={season ?? new Date().getFullYear()}
           placeholder={

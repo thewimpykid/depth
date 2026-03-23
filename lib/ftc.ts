@@ -409,7 +409,8 @@ function parseDisplayMatch(raw: unknown, teamNumber: number): TeamMatch | null {
 }
 
 function mergeScheduleWithResults(scheduleRows: unknown[], resultRows: unknown[]) {
-  const resultByMatch = new Map<number, Record<string, unknown>>();
+  // Keyed by tournamentLevel:series:matchNumber so playoff rounds don't clobber each other
+  const resultByMatch = new Map<string, Record<string, unknown>>();
 
   for (const raw of resultRows) {
     const obj = asObject(raw);
@@ -418,7 +419,12 @@ function mergeScheduleWithResults(scheduleRows: unknown[], resultRows: unknown[]
     const matchNumber = pickNumber(obj, ["matchNumber", "number"]);
     if (matchNumber === null) continue;
 
-    resultByMatch.set(matchNumber, obj);
+    const key = getMatchIdentityKey(
+      pickString(obj, ["tournamentLevel", "matchLevel"]),
+      pickNumber(obj, ["series"]),
+      matchNumber,
+    );
+    resultByMatch.set(key, obj);
   }
 
   return scheduleRows.map((raw) => {
@@ -428,7 +434,12 @@ function mergeScheduleWithResults(scheduleRows: unknown[], resultRows: unknown[]
     const matchNumber = pickNumber(scheduleObj, ["matchNumber", "number"]);
     if (matchNumber === null) return raw;
 
-    const resultObj = resultByMatch.get(matchNumber);
+    const key = getMatchIdentityKey(
+      pickString(scheduleObj, ["tournamentLevel", "matchLevel"]),
+      pickNumber(scheduleObj, ["series"]),
+      matchNumber,
+    );
+    const resultObj = resultByMatch.get(key);
     if (!resultObj) return raw;
 
     return {
@@ -1109,10 +1120,34 @@ export async function getTeamEventDetails(
     asArray(qualSchedule.schedule),
     asArray(qualResults.matches),
   );
-  const playoffDisplayRows = mergeScheduleWithResults(
-    asArray(playoffSchedule.schedule),
-    asArray(playoffResults.matches),
-  );
+
+  // Index playoff results by description — the description (e.g. "Upper Bracket  Round 2 Match 3")
+  // is unique per match and identical between the schedule and matches endpoints.
+  // matchNumber alone is NOT unique (every match in this bracket is matchNumber=1).
+  const playoffResultByDesc = new Map<string, Record<string, unknown>>();
+  for (const raw of asArray(playoffResults.matches)) {
+    const obj = asObject(raw);
+    if (!obj) continue;
+    const desc = pickString(obj, ["description"]);
+    if (desc) playoffResultByDesc.set(desc.toLowerCase(), obj);
+  }
+
+  // Merge schedule rows (have team names) with result rows (have correct scores).
+  const playoffDisplayRows = asArray(playoffSchedule.schedule).map((raw) => {
+    const obj = asObject(raw);
+    if (!obj) return raw;
+    const desc = pickString(obj, ["description"]);
+    if (!desc) return raw;
+    const resultObj = playoffResultByDesc.get(desc.toLowerCase());
+    if (!resultObj) return raw; // unplayed — no scores yet
+    return {
+      ...obj,
+      scoreRedFinal: pickNumber(resultObj, ["scoreRedFinal", "redScoreFinal", "scoreRed"]),
+      scoreBlueFinal: pickNumber(resultObj, ["scoreBlueFinal", "blueScoreFinal", "scoreBlue"]),
+      actualStartTime: pickString(resultObj, ["actualStartTime"]),
+      postResultTime: pickString(resultObj, ["postResultTime"]),
+    };
+  });
 
   const matches = [...qualDisplayRows, ...playoffDisplayRows]
     .map((row) => parseDisplayMatch(row, teamNumber))

@@ -132,33 +132,48 @@ function scoreEntry(haystack: string, exactKey: string, query: string, secondary
   const normalized = query.trim().toLowerCase();
   if (!normalized) return -1;
 
+  // Pure numeric query — optimised for team number lookup
+  if (/^\d+$/.test(normalized)) {
+    if (exactKey === normalized) return 10000; // exact team number: top slot
+    if (exactKey.startsWith(normalized)) {
+      // Longer prefix typed = fewer matches = higher score; keeps 237 < 2378 < 23786
+      return 1000 + normalized.length * 10;
+    }
+    // Number appears somewhere else in the haystack (e.g. in the name)
+    if (haystack.includes(normalized)) return 5;
+    return -1;
+  }
+
   const tokens = normalized.split(/\s+/).filter(Boolean);
   const words = haystack.split(/\s+/);
   let score = 0;
 
   for (const token of tokens) {
+    let tokenScore = 0;
+
     if (exactKey === token) {
-      score += 14;
+      tokenScore = 14;
     } else if (exactKey.startsWith(token)) {
-      score += 10;
+      tokenScore = 10;
     } else if (secondaryKey && secondaryKey === token) {
-      score += 12;
+      tokenScore = 12;
     } else if (secondaryKey && secondaryKey.startsWith(token)) {
-      score += 8;
-    } else if (haystack.includes(token)) {
-      score += 3;
-      // Extra boost when token matches the start of any word in the haystack
-      if (words.some((word) => word.startsWith(token))) {
-        score += 3;
-      }
+      tokenScore = 9;
     } else {
-      return -1;
+      const exactWord = words.some((w) => w === token);
+      const wordStart = words.some((w) => w.startsWith(token) && w !== token);
+      const inHaystack = haystack.includes(token);
+
+      if (exactWord) tokenScore = 8;
+      else if (wordStart) tokenScore = 5;
+      else if (inHaystack) tokenScore = 2;
+      else return -1; // token not found anywhere — reject
     }
+
+    score += tokenScore;
   }
 
-  if (haystack.startsWith(normalized)) {
-    score += 6;
-  }
+  if (haystack.startsWith(normalized)) score += 6;
 
   return score;
 }
@@ -240,9 +255,15 @@ export async function getSearchSuggestions(
     }
   }
 
+  const isNumericQuery = /^\d+$/.test(trimmed);
+
   return results
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
+      // Numeric queries: sort teams by team number ascending (2370 before 23786)
+      if (isNumericQuery && a.type === "team" && b.type === "team" && a.teamNumber && b.teamNumber) {
+        return a.teamNumber - b.teamNumber;
+      }
       return a.title.localeCompare(b.title);
     })
     .slice(0, limit)
