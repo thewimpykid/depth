@@ -258,12 +258,33 @@ function normalizeRows(view: SeasonRecordsView, rows: unknown[]) {
     .filter((row): row is MatchSeasonRecordRow => row !== null);
 }
 
+async function fetchOnePage(
+  season: number,
+  view: SeasonRecordsView,
+  skip: number,
+): Promise<SeasonRecordsDataset | null> {
+  const url = `${FTCSCOUT_WEB_BASE}/records/${season}/${view}${skip > 0 ? `?skip=${skip}` : ""}`;
+  const response = await fetch(url, {
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "User-Agent": "depth/0.1 (+https://ftcscout.org)",
+    },
+    cache: "no-store",
+  });
+  if (!response.ok) return null;
+  const html = await response.text();
+  try {
+    const parsed = extractRecordsPayload(html);
+    return { count: parsed.count, rows: normalizeRows(view, parsed.rows) };
+  } catch {
+    return null;
+  }
+}
+
 export async function getSeasonRecords(season: number, view: SeasonRecordsView) {
   const cacheKey = `v2:${season}:${view}`;
   const cached = cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
-  if (cached) {
-    return cached;
-  }
+  if (cached) return cached;
 
   const response = await fetch(`${FTCSCOUT_WEB_BASE}/records/${season}/${view}`, {
     headers: {
@@ -279,7 +300,6 @@ export async function getSeasonRecords(season: number, view: SeasonRecordsView) 
 
   const html = await response.text();
   const parsed = extractRecordsPayload(html);
-
   const dataset: SeasonRecordsDataset = {
     count: parsed.count,
     rows: normalizeRows(view, parsed.rows),
@@ -287,4 +307,87 @@ export async function getSeasonRecords(season: number, view: SeasonRecordsView) 
 
   cacheManager.set("ftcscout-records", cacheKey, dataset, CACHE_TTL.EVENTS);
   return dataset;
+}
+
+export async function getSeasonRecordsTopN(
+  season: number,
+  view: SeasonRecordsView,
+  target: number,
+): Promise<SeasonRecordsDataset> {
+  const cacheKey = `v2:top${target}:${season}:${view}`;
+  const cached = cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
+  if (cached) return cached;
+
+  const first = await getSeasonRecords(season, view);
+  const pageSize = first.rows.length;
+
+  if (pageSize === 0 || pageSize >= target) {
+    return first;
+  }
+
+  // Fetch remaining pages concurrently
+  const totalNeeded = Math.min(target, first.count);
+  const skips: number[] = [];
+  for (let skip = pageSize; skip < totalNeeded; skip += pageSize) {
+    skips.push(skip);
+  }
+
+  const pages = await Promise.all(skips.map((skip) => fetchOnePage(season, view, skip)));
+  const allRows = [
+    ...first.rows,
+    ...pages.flatMap((p) => p?.rows ?? []),
+  ].slice(0, target);
+
+  const result: SeasonRecordsDataset = { count: first.count, rows: allRows };
+  cacheManager.set("ftcscout-records", cacheKey, result, CACHE_TTL.EVENTS);
+  return result;
+}
+
+/**
+ * Fetches `target` team records sampled evenly across the full ranking range,
+ * so the scatter plot shows the complete OPR distribution (not just top performers).
+ */
+export async function getSeasonRecordsSpread(
+  season: number,
+  view: SeasonRecordsView,
+  target: number,
+): Promise<SeasonRecordsDataset> {
+  const cacheKey = `v2:spread${target}:${season}:${view}`;
+  const cached = cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
+  if (cached) return cached;
+
+  // First page to learn page size + total count
+  const first = await getSeasonRecords(season, view);
+  const pageSize = first.rows.length;
+
+  if (pageSize === 0) return first;
+
+  const totalCount = first.count;
+
+  // If we have fewer teams than target, just return everything
+  if (totalCount <= target) {
+    return getSeasonRecordsTopN(season, view, totalCount);
+  }
+
+  // Generate skip values spread evenly across [0, totalCount)
+  const pagesNeeded = Math.ceil(target / pageSize);
+  const totalPages = Math.ceil(totalCount / pageSize);
+  const step = totalPages / pagesNeeded;
+
+  const skips: number[] = [];
+  for (let i = 0; i < pagesNeeded; i++) {
+    const pageIndex = Math.round(i * step);
+    const skip = pageIndex * pageSize;
+    if (skip > 0 && skip < totalCount) skips.push(skip);
+  }
+
+  const pages = await Promise.all(skips.map((skip) => fetchOnePage(season, view, skip)));
+  const allRows = [
+    ...first.rows,
+    ...pages.flatMap((p) => p?.rows ?? []),
+  ].slice(0, target);
+
+  const result: SeasonRecordsDataset = { count: totalCount, rows: allRows };
+  cacheManager.set("ftcscout-records", cacheKey, result, CACHE_TTL.EVENTS);
+  return result;
 }

@@ -114,6 +114,7 @@ export default function SmartSearchInput({
       .finally(() => {
         if (requestId.current === currentRequest) setLoading(false);
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedValue, scope, season]);
 
   useEffect(() => {

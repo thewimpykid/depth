@@ -21,7 +21,7 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
-      <div className="mx-auto max-w-6xl px-5 py-4 sm:px-8 sm:py-6">
+      <div className="mx-auto max-w-7xl px-5 py-4 sm:px-8 sm:py-6">
         <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>

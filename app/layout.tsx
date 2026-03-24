@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import SiteHeader from "./site-header";
 import "./globals.css";
+import { getCurrentSeasonWithOptions } from "@/lib/team-analysis";
 
 const displayFont = Space_Grotesk({
   variable: "--font-display",
@@ -26,18 +27,26 @@ export const metadata: Metadata = {
   description: "FTC team events, matches, and OPR.",
 };
 
-export default function RootLayout({
+const themeScript = `(function(){try{var t=localStorage.getItem('depth-theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`;
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const { currentSeason } = await getCurrentSeasonWithOptions().catch(() => ({ currentSeason: 2024, seasonOptions: [] as number[] }));
+
   return (
     <html
       lang="en"
+      data-theme="dark"
       className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full flex flex-col bg-[#050505]">
-        <SiteHeader />
+        <SiteHeader season={currentSeason} />
         <div className="flex-1">{children}</div>
         <Analytics />
         <SpeedInsights />

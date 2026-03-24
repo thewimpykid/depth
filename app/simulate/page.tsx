@@ -178,11 +178,13 @@ function StandingCard({
   season,
   index,
   showPlayoffs,
+  dataMode,
 }: {
   row: ActualEventStanding;
   season: number;
   index: number;
   showPlayoffs: boolean;
+  dataMode: "season" | "pre-event" | "post-event";
 }) {
   return (
     <article className="rounded-[10px] border border-white/10 bg-[#101010] px-4 py-3">
@@ -195,6 +197,11 @@ function StandingCard({
             <span className="text-base font-medium text-white">{row.teamNumber}</span>
             {row.name ? (
               <span className="ml-2 truncate text-sm text-white/52">{row.name}</span>
+            ) : null}
+            {(dataMode === "pre-event" || dataMode === "season") && row.isFirstEvent ? (
+              <span className="ml-2 rounded-[4px] border border-yellow-500/25 bg-yellow-500/8 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em] text-yellow-300/60">
+                No prior data
+              </span>
             ) : null}
           </div>
         </div>
@@ -271,7 +278,10 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
   const rawEventQuery = typeof searchParams.eventQuery === "string" ? searchParams.eventQuery : "";
   const rawEventCode = typeof searchParams.eventCode === "string" ? searchParams.eventCode : "";
   const rawMode = typeof searchParams.mode === "string" ? searchParams.mode : "api";
+  const rawDataMode = typeof searchParams.dataMode === "string" ? searchParams.dataMode : "season";
   const scheduleMode: "api" | "random" = rawMode === "random" ? "random" : "api";
+  const dataMode: "season" | "pre-event" | "post-event" =
+    rawDataMode === "pre-event" ? "pre-event" : rawDataMode === "post-event" ? "post-event" : "season";
   const season =
     typeof searchParams.season === "string" && isSeason(searchParams.season)
       ? Number(searchParams.season)
@@ -289,8 +299,8 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
 
   const selectedSimulation = eventCode
     ? scheduleMode === "random"
-      ? await simulateRandomScheduleEvent(season, eventCode, simulations)
-      : await simulateActualEvent(season, eventCode, simulations)
+      ? await simulateRandomScheduleEvent(season, eventCode, simulations, dataMode)
+      : await simulateActualEvent(season, eventCode, simulations, dataMode)
     : null;
 
   const isRandom = selectedSimulation?.scheduleMode === "random";
@@ -298,15 +308,16 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
-      <div className="mx-auto max-w-6xl px-5 py-4 sm:px-8 sm:py-6">
+      <div className="mx-auto max-w-7xl px-5 py-4 sm:px-8 sm:py-6">
         <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
           <h1 className="text-2xl font-medium tracking-[-0.05em] text-white sm:text-3xl">Simulate Event</h1>
           <SimulateControls
-            key={`simulate-controls:${season}:${eventQuery}:${eventCode}:${simulations}:${scheduleMode}`}
+            key={`simulate-controls:${season}:${eventQuery}:${eventCode}:${simulations}:${scheduleMode}:${dataMode}`}
             initialEventQuery={eventQuery}
             initialSeason={season}
             initialRuns={simulations}
             initialMode={scheduleMode}
+            initialDataMode={dataMode}
             seasonOptions={seasonOptions}
             matchedEvents={eventMatches}
             selectedEventCode={eventCode}
@@ -385,6 +396,26 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
 
                 {(isRandom || selectedSimulation.totalQualMatches > 0) ? (
                   <>
+                    {selectedSimulation.dataMode === "season" ? (
+                      <section className="mt-4 rounded-[10px] border border-yellow-500/20 bg-yellow-500/5 px-4 py-3 text-sm text-yellow-200/60">
+                        <strong className="text-yellow-200/80">Season Best OPR.</strong>{" "}
+                        Strength is each team&apos;s best per-event OPR across the full season, which may include events{" "}
+                        <em>after</em> this one. Switch to{" "}
+                        <strong className="text-yellow-200/70">Pre-Event</strong> for historically accurate predictions.
+                      </section>
+                    ) : selectedSimulation.dataMode === "pre-event" ? (
+                      <section className="mt-4 rounded-[10px] border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm text-sky-200/60">
+                        <strong className="text-sky-200/80">Pre-event mode.</strong>{" "}
+                        Strength uses OPR from each team&apos;s most recent event that ended before this one.
+                        Teams with <span className="rounded border border-yellow-500/25 bg-yellow-500/8 px-1 text-yellow-300/70 text-xs">No prior data</span>{" "}
+                        had no prior-season matches and are assigned the event average.
+                      </section>
+                    ) : (
+                      <section className="mt-4 rounded-[10px] border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-200/60">
+                        <strong className="text-emerald-200/80">Post-event mode.</strong>{" "}
+                        Strength is OPR computed from this event&apos;s own match results. Only meaningful after the event has played matches.
+                      </section>
+                    )}
                     <section className="mt-4 grid gap-4 2xl:grid-cols-[1.2fr_0.9fr]">
                       <div className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -403,6 +434,7 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
                               season={season}
                               index={index}
                               showPlayoffs={showPlayoffs}
+                              dataMode={selectedSimulation.dataMode}
                             />
                           ))}
                         </div>
@@ -413,7 +445,13 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
                         <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
                           <div className="text-base font-medium text-white">Model notes</div>
                           <div className="mt-2 space-y-1.5 text-xs text-white/54">
-                            <div>Strength = current season Total NP from FTC match data.</div>
+                            {selectedSimulation.dataMode === "season" ? (
+                              <div>Strength = best per-event OPR across the full season. May include events after this one.</div>
+                            ) : selectedSimulation.dataMode === "pre-event" ? (
+                              <div>Strength = OPR from the team&apos;s most recent event before this one. No future data.</div>
+                            ) : (
+                              <div>Strength = OPR computed from this event&apos;s own match results.</div>
+                            )}
                             {isRandom ? (
                               <div className="text-violet-300/70">Each run uses a freshly shuffled schedule — no draw bias. Matches shown are one sample for reference.</div>
                             ) : (

@@ -2,8 +2,6 @@ import "server-only";
 
 import { cacheManager, CACHE_TTL } from "@/lib/cache-manager";
 import { ftcApiClient } from "@/lib/ftc-api-client";
-import { ftcScoutApiClient } from "@/lib/ftcscout-api-client";
-import type { RankedValue, TeamQuickStats } from "@/lib/ftc";
 import type { TeamSnapshot } from "@/lib/team-analysis";
 
 export type EventSearchResult = {
@@ -52,6 +50,8 @@ export type ActualEventStanding = {
   championProbability: number;
   finalistProbability: number;
   semifinalistProbability: number;
+  /** True in pre-event mode when the team had no prior-season match data. */
+  isFirstEvent: boolean;
 };
 
 export type ActualEventSimulationResult = {
@@ -65,6 +65,13 @@ export type ActualEventSimulationResult = {
   playedQualMatches: number;
   remainingQualMatches: number;
   scheduleMode: "api" | "random";
+  /**
+   * How team strength was derived:
+   *   season    – best per-event OPR across all the team's events this season
+   *   pre-event – OPR from the team's most recent event that ended before this event
+   *   post-event – OPR computed from this event's own match results
+   */
+  dataMode: "season" | "pre-event" | "post-event";
 };
 
 type TeamProfile = {
@@ -181,38 +188,6 @@ function normalizeTeam(raw: unknown): TeamProfile | null {
   };
 }
 
-function formatPercentile(rank: number | null, count: number | null) {
-  if (!rank || !count || count <= 0) return null;
-  return round(((count - rank) / count) * 100, 2);
-}
-
-function normalizeRankedValue(
-  raw: Record<string, unknown> | null,
-  count: number | null,
-): RankedValue {
-  const value = raw ? asNumber(raw.value) : null;
-  const rank = raw ? asNumber(raw.rank) : null;
-
-  return {
-    value: value === null ? null : round(value),
-    rank,
-    percentile: formatPercentile(rank, count),
-  };
-}
-
-function normalizeQuickStats(raw: unknown): TeamQuickStats | null {
-  const obj = asObject(raw);
-  if (!obj) return null;
-
-  const comparedAgainst = asNumber(obj.count);
-  return {
-    total: normalizeRankedValue(asObject(obj.tot), comparedAgainst),
-    auto: normalizeRankedValue(asObject(obj.auto), comparedAgainst),
-    teleop: normalizeRankedValue(asObject(obj.dc), comparedAgainst),
-    endgame: normalizeRankedValue(asObject(obj.eg), comparedAgainst),
-    comparedAgainst,
-  };
-}
 
 function eventSearchScore(event: EventSearchResult, query: string) {
   const haystack = [event.code, event.name, event.location ?? ""].join(" ").toLowerCase();
@@ -498,12 +473,238 @@ function simulatePlayoffs(
   return results;
 }
 
-async function getEventTeamSnapshots(eventCode: string, season: number) {
-  const cacheKey = `event-roster:${season}:${eventCode.toUpperCase()}`;
-  const cached = cacheManager.get<TeamSnapshot[]>("analysis", cacheKey);
-  if (cached) {
-    return cached;
+// Lightweight match score record used for OPR computation.
+type MatchScore = {
+  redTeams: number[];
+  blueTeams: number[];
+  redScore: number | null;
+  blueScore: number | null;
+};
+
+function parseMatchScores(rawRows: unknown[]): MatchScore[] {
+  return rawRows
+    .map((rawRow) => {
+      const obj = asObject(rawRow);
+      if (!obj) return null;
+      const { redAlliance, blueAlliance } = getAllianceTeams(asArray(obj.teams));
+      return {
+        redTeams: redAlliance.map((t) => t.teamNumber),
+        blueTeams: blueAlliance.map((t) => t.teamNumber),
+        redScore: pickNumber(obj, ["scoreRedFinal", "redScoreFinal", "scoreRed"]),
+        blueScore: pickNumber(obj, ["scoreBlueFinal", "blueScoreFinal", "scoreBlue"]),
+      };
+    })
+    .filter(
+      (m): m is MatchScore =>
+        m !== null && m.redTeams.length >= 2 && m.blueTeams.length >= 2,
+    );
+}
+
+/**
+ * Solve Ax = b via Gauss-Jordan elimination with partial pivoting.
+ * Returns the solution vector; entries are 0 for linearly dependent rows.
+ */
+function solveLinearSystem(A: number[][], b: number[]): number[] {
+  const n = A.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+
+  for (let col = 0; col < n; col++) {
+    let maxRow = col;
+    for (let row = col + 1; row < n; row++) {
+      if (Math.abs(M[row][col]) > Math.abs(M[maxRow][col])) maxRow = row;
+    }
+    [M[col], M[maxRow]] = [M[maxRow], M[col]];
+
+    if (Math.abs(M[col][col]) < 1e-10) continue;
+
+    for (let row = 0; row < n; row++) {
+      if (row === col || Math.abs(M[row][col]) < 1e-14) continue;
+      const factor = M[row][col] / M[col][col];
+      for (let k = col; k <= n; k++) M[row][k] -= factor * M[col][k];
+    }
   }
+
+  return Array.from({ length: n }, (_, i) =>
+    Math.abs(M[i][i]) < 1e-10 ? 0 : M[i][n] / M[i][i],
+  );
+}
+
+/**
+ * Compute OPR for a set of teams from their match results via least squares.
+ * Uses the normal equations: (AᵀA)x = Aᵀb where A is the alliance membership
+ * matrix and b is the alliance score vector.
+ */
+function solveOpr(teamNumbers: number[], matches: MatchScore[]): Map<number, number> {
+  const n = teamNumbers.length;
+  if (n === 0) return new Map();
+
+  const idx = new Map(teamNumbers.map((t, i) => [t, i]));
+  const AtA = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+  const Atb = new Array<number>(n).fill(0);
+
+  for (const match of matches) {
+    if (match.redScore === null || match.blueScore === null) continue;
+    for (const [teamsList, score] of [
+      [match.redTeams, match.redScore] as const,
+      [match.blueTeams, match.blueScore] as const,
+    ]) {
+      const indices = teamsList
+        .map((t) => idx.get(t))
+        .filter((i): i is number => i !== undefined);
+      for (const i of indices) {
+        Atb[i] += score;
+        for (const j of indices) AtA[i][j] += 1;
+      }
+    }
+  }
+
+  const x = solveLinearSystem(AtA, Atb);
+  const result = new Map<number, number>();
+  teamNumbers.forEach((t, i) => result.set(t, round(Math.max(0, x[i]))));
+  return result;
+}
+
+/** Fetch an event's full team list + qual match scores and return NP OPR per team. */
+async function computeEventOpr(eventCode: string, season: number): Promise<Map<number, number>> {
+  const [teamsResp, schedResp] = await Promise.all([
+    ftcApiClient.getEventTeams(eventCode, season).catch(() => ({ teams: [] })),
+    ftcApiClient.getHybridSchedule(eventCode, "qual", { season }).catch(() => ({ schedule: [] })),
+  ]);
+
+  const teamNumbers = asArray(teamsResp.teams)
+    .map((t) => {
+      const obj = asObject(t);
+      return obj ? pickNumber(obj, ["teamNumber", "number"]) : null;
+    })
+    .filter((n): n is number => n !== null);
+
+  const matches = parseMatchScores(asArray(schedResp.schedule));
+  return solveOpr(teamNumbers, matches);
+}
+
+type StrengthResult = { strength: number | null; isFirstEvent: boolean };
+
+/**
+ * Pre-event mode: for each team, find their most recent event that ended before
+ * `beforeDate`, compute OPR at that event, and return that OPR as their strength.
+ */
+async function computePreEventStrengths(
+  teams: TeamProfile[],
+  season: number,
+  beforeDate: string,
+): Promise<Map<number, StrengthResult>> {
+  const beforeTime = new Date(beforeDate).getTime();
+
+  // Per team: find the most recent prior event (sorted desc by end date).
+  const teamMostRecentCode = new Map<number, string | null>();
+  await mapWithConcurrency(teams, 8, async (team) => {
+    const resp = await ftcApiClient
+      .getTeamEvents(team.teamNumber, season)
+      .catch(() => ({ events: [] }));
+    const prior = asArray(resp.events)
+      .map(normalizeEvent)
+      .filter((e): e is EventSearchResult => e !== null)
+      .filter((e) => {
+        const end = e.end ?? e.start;
+        return end !== null && new Date(end).getTime() < beforeTime;
+      })
+      .sort((a, b) => new Date(b.end ?? b.start ?? "").getTime() - new Date(a.end ?? a.start ?? "").getTime());
+    teamMostRecentCode.set(team.teamNumber, prior[0]?.code ?? null);
+  });
+
+  // Compute OPR once per unique prior event code.
+  const uniqueCodes = new Set<string>();
+  for (const code of teamMostRecentCode.values()) if (code) uniqueCodes.add(code);
+
+  const oprByEvent = new Map<string, Map<number, number>>();
+  await mapWithConcurrency([...uniqueCodes], 4, async (code) => {
+    oprByEvent.set(code, await computeEventOpr(code, season).catch(() => new Map()));
+  });
+
+  const results = new Map<number, StrengthResult>();
+  for (const team of teams) {
+    const code = teamMostRecentCode.get(team.teamNumber) ?? null;
+    results.set(team.teamNumber, {
+      strength: code ? (oprByEvent.get(code)?.get(team.teamNumber) ?? null) : null,
+      isFirstEvent: code === null,
+    });
+  }
+  return results;
+}
+
+/**
+ * Post-event mode: compute OPR from this event's own match results.
+ * Only useful after the event has finished.
+ */
+async function computePostEventStrengths(
+  eventCode: string,
+  season: number,
+  teams: TeamProfile[],
+): Promise<Map<number, StrengthResult>> {
+  const opr = await computeEventOpr(eventCode, season).catch(() => new Map<number, number>());
+  const results = new Map<number, StrengthResult>();
+  for (const team of teams) {
+    results.set(team.teamNumber, {
+      strength: opr.get(team.teamNumber) ?? null,
+      isFirstEvent: false,
+    });
+  }
+  return results;
+}
+
+/**
+ * Season mode: for each team, compute OPR at every event they attended this season
+ * and use their best (highest) result as their strength.
+ */
+async function computeFullSeasonBestStrengths(
+  teams: TeamProfile[],
+  season: number,
+): Promise<Map<number, StrengthResult>> {
+  // Collect all season events per team.
+  const teamEventCodes = new Map<number, string[]>();
+  await mapWithConcurrency(teams, 8, async (team) => {
+    const resp = await ftcApiClient
+      .getTeamEvents(team.teamNumber, season)
+      .catch(() => ({ events: [] }));
+    const codes = asArray(resp.events)
+      .map(normalizeEvent)
+      .filter((e): e is EventSearchResult => e !== null)
+      .map((e) => e.code);
+    teamEventCodes.set(team.teamNumber, codes);
+  });
+
+  // Compute OPR once per unique event.
+  const uniqueCodes = new Set<string>();
+  for (const codes of teamEventCodes.values()) for (const c of codes) uniqueCodes.add(c);
+
+  const oprByEvent = new Map<string, Map<number, number>>();
+  await mapWithConcurrency([...uniqueCodes], 4, async (code) => {
+    oprByEvent.set(code, await computeEventOpr(code, season).catch(() => new Map()));
+  });
+
+  // Per team: best (max) OPR across all their events.
+  const results = new Map<number, StrengthResult>();
+  for (const team of teams) {
+    const codes = teamEventCodes.get(team.teamNumber) ?? [];
+    let best: number | null = null;
+    for (const code of codes) {
+      const opr = oprByEvent.get(code)?.get(team.teamNumber);
+      if (opr !== undefined && (best === null || opr > best)) best = opr;
+    }
+    results.set(team.teamNumber, { strength: best, isFirstEvent: codes.length === 0 });
+  }
+  return results;
+}
+
+async function getEventTeamSnapshots(
+  eventCode: string,
+  season: number,
+  mode: "season" | "pre-event" | "post-event" = "season",
+  priorToDate?: string | null,
+): Promise<TeamSnapshot[]> {
+  const cacheKey = `event-roster-${mode}:${season}:${eventCode.toUpperCase()}`;
+  const cached = cacheManager.get<TeamSnapshot[]>("analysis", cacheKey);
+  if (cached) return cached;
 
   const eventTeamsResponse = await ftcApiClient.getEventTeams(eventCode, season);
   const teams = asArray(eventTeamsResponse.teams)
@@ -511,12 +712,18 @@ async function getEventTeamSnapshots(eventCode: string, season: number) {
     .filter((team): team is TeamProfile => team !== null)
     .sort((a, b) => a.teamNumber - b.teamNumber);
 
-  const snapshots = await mapWithConcurrency(teams, 6, async (team) => {
-    const quickStatsResponse = await ftcScoutApiClient
-      .getTeamQuickStats(team.teamNumber, season)
-      .catch(() => null);
-    const quickStats = normalizeQuickStats(quickStatsResponse);
+  let strengthMap: Map<number, StrengthResult>;
 
+  if (mode === "pre-event" && priorToDate) {
+    strengthMap = await computePreEventStrengths(teams, season, priorToDate);
+  } else if (mode === "post-event") {
+    strengthMap = await computePostEventStrengths(eventCode, season, teams);
+  } else {
+    strengthMap = await computeFullSeasonBestStrengths(teams, season);
+  }
+
+  const snapshots: TeamSnapshot[] = teams.map((team) => {
+    const data = strengthMap.get(team.teamNumber);
     return {
       teamNumber: team.teamNumber,
       season,
@@ -525,8 +732,9 @@ async function getEventTeamSnapshots(eventCode: string, season: number) {
       rookieYear: team.rookieYear,
       location: team.location,
       eventCount: 0,
-      quickStats,
-      strength: quickStats?.total.value ?? null,
+      quickStats: null,
+      strength: data?.strength ?? null,
+      isFirstEvent: data?.isFirstEvent ?? false,
     } satisfies TeamSnapshot;
   });
 
@@ -631,18 +839,23 @@ export async function simulateActualEvent(
   season: number,
   eventCode: string,
   simulations: number,
+  dataMode: "season" | "pre-event" | "post-event" = "season",
 ): Promise<ActualEventSimulationResult | null> {
-  const [event, teams, hybridSchedule] = await Promise.all([
+  const [event, hybridSchedule] = await Promise.all([
     getSeasonEventByCode(season, eventCode),
-    getEventTeamSnapshots(eventCode, season),
     ftcApiClient
       .getHybridSchedule(eventCode, "qual", { season })
       .catch(() => ({ schedule: [] })),
   ]);
 
-  if (!event) {
-    return null;
-  }
+  if (!event) return null;
+
+  const teams = await getEventTeamSnapshots(
+    eventCode,
+    season,
+    dataMode,
+    dataMode === "pre-event" ? (event.start ?? undefined) : undefined,
+  );
 
   const strengths = teams
     .map((team) => team.strength)
@@ -696,6 +909,7 @@ export async function simulateActualEvent(
       championProbability: 0,
       finalistProbability: 0,
       semifinalistProbability: 0,
+      isFirstEvent: (team as TeamSnapshot).isFirstEvent ?? false,
     });
   }
 
@@ -788,6 +1002,7 @@ export async function simulateActualEvent(
     playedQualMatches: playedMatches.length,
     remainingQualMatches: remainingMatches.length,
     scheduleMode: "api",
+    dataMode,
   };
 }
 
@@ -795,13 +1010,19 @@ export async function simulateRandomScheduleEvent(
   season: number,
   eventCode: string,
   simulations: number,
+  dataMode: "season" | "pre-event" | "post-event" = "season",
 ): Promise<ActualEventSimulationResult | null> {
-  const [event, teams] = await Promise.all([
-    getSeasonEventByCode(season, eventCode),
-    getEventTeamSnapshots(eventCode, season),
-  ]);
+  const event = await getSeasonEventByCode(season, eventCode);
+  if (!event) return null;
 
-  if (!event || teams.length < 4) return null;
+  const teams = await getEventTeamSnapshots(
+    eventCode,
+    season,
+    dataMode,
+    dataMode === "pre-event" ? (event.start ?? undefined) : undefined,
+  );
+
+  if (teams.length < 4) return null;
 
   const strengths = teams
     .map((t) => t.strength)
@@ -863,6 +1084,7 @@ export async function simulateRandomScheduleEvent(
       championProbability: 0,
       finalistProbability: 0,
       semifinalistProbability: 0,
+      isFirstEvent: (team as TeamSnapshot).isFirstEvent ?? false,
     });
   }
 
@@ -954,5 +1176,6 @@ export async function simulateRandomScheduleEvent(
     playedQualMatches: 0,
     remainingQualMatches: sampleMatches.length,
     scheduleMode: "random",
+    dataMode,
   };
 }

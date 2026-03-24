@@ -554,14 +554,13 @@ function normalizeRows(view: SeasonRecordsView, rows: unknown[]) {
     .filter((row): row is MatchSeasonRecordRow => row !== null);
 }
 
-export async function getSeasonRecords(season: number, view: SeasonRecordsView) {
-  const cacheKey = `${season}:${view}`;
-  const cached = cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  const response = await fetch(`${FTCSCOUT_WEB_BASE}/records/${season}/${view}`, {
+async function fetchRecordsPage(
+  season: number,
+  view: SeasonRecordsView,
+  skip: number,
+): Promise<SeasonRecordsDataset | null> {
+  const url = `${FTCSCOUT_WEB_BASE}/records/${season}/${view}${skip > 0 ? `?skip=${skip}` : ""}`;
+  const response = await fetch(url, {
     headers: {
       Accept: "text/html,application/xhtml+xml",
       "User-Agent": "depth/0.1 (+https://ftcscout.org)",
@@ -569,30 +568,60 @@ export async function getSeasonRecords(season: number, view: SeasonRecordsView) 
     cache: "no-store",
   });
 
-  if (!response.ok) {
-    throw new Error(`FTCScout records request failed with ${response.status}.`);
-  }
+  if (!response.ok) return null;
 
   const html = await response.text();
-  let dataset: SeasonRecordsDataset | null = null;
-
   try {
     const parsed = extractRecordsPayload(html);
-    dataset = {
-      count: parsed.count,
-      rows: normalizeRows(view, parsed.rows),
-    };
+    return { count: parsed.count, rows: normalizeRows(view, parsed.rows) };
   } catch {
-    dataset = extractRowsFromRenderedTable(html, view);
+    return extractRowsFromRenderedTable(html, view);
   }
+}
 
-  if (!dataset) {
-    dataset = {
-      count: 0,
-      rows: [],
-    };
-  }
+export async function getSeasonRecords(season: number, view: SeasonRecordsView) {
+  const cacheKey = `${season}:${view}`;
+  const cached = cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
+  if (cached) return cached;
 
+  const dataset = (await fetchRecordsPage(season, view, 0)) ?? { count: 0, rows: [] };
   cacheManager.set("ftcscout-records", cacheKey, dataset, CACHE_TTL.EVENTS);
   return dataset;
+}
+
+export async function getSeasonRecordsTopN(
+  season: number,
+  view: SeasonRecordsView,
+  target: number,
+): Promise<SeasonRecordsDataset> {
+  const cacheKey = `top${target}:${season}:${view}`;
+  const cached = cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
+  if (cached) return cached;
+
+  // Fetch first page to discover page size and total count
+  const first = (await fetchRecordsPage(season, view, 0)) ?? { count: 0, rows: [] };
+  const pageSize = first.rows.length;
+
+  if (pageSize === 0 || first.rows.length >= target) {
+    const result = { count: first.count, rows: first.rows.slice(0, target) };
+    cacheManager.set("ftcscout-records", cacheKey, result, CACHE_TTL.EVENTS);
+    return result;
+  }
+
+  // Fetch remaining pages concurrently
+  const totalNeeded = Math.min(target, first.count);
+  const skips: number[] = [];
+  for (let skip = pageSize; skip < totalNeeded; skip += pageSize) {
+    skips.push(skip);
+  }
+
+  const pages = await Promise.all(skips.map((skip) => fetchRecordsPage(season, view, skip)));
+  const allRows = [
+    ...first.rows,
+    ...pages.flatMap((p) => p?.rows ?? []),
+  ].slice(0, target);
+
+  const result: SeasonRecordsDataset = { count: first.count, rows: allRows };
+  cacheManager.set("ftcscout-records", cacheKey, result, CACHE_TTL.EVENTS);
+  return result;
 }

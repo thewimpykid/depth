@@ -17,6 +17,8 @@ export type TeamSnapshot = {
   eventCount: number;
   quickStats: TeamQuickStats | null;
   strength: number | null;
+  /** True when pre-event mode was used and the team had no prior season matches. */
+  isFirstEvent?: boolean;
 };
 
 export type SimulationTeamSide = {

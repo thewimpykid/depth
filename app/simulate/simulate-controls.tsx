@@ -42,6 +42,7 @@ export default function SimulateControls({
   initialSeason,
   initialRuns,
   initialMode = "api",
+  initialDataMode = "season",
   seasonOptions,
   matchedEvents,
   selectedEventCode,
@@ -50,6 +51,7 @@ export default function SimulateControls({
   initialSeason: number;
   initialRuns: number;
   initialMode?: "api" | "random";
+  initialDataMode?: "season" | "pre-event" | "post-event";
   seasonOptions: number[];
   matchedEvents: EventSearchResult[];
   selectedEventCode: string;
@@ -61,6 +63,7 @@ export default function SimulateControls({
   const [season, setSeason] = useState(String(initialSeason));
   const [runs, setRuns] = useState(String(initialRuns));
   const [mode, setMode] = useState<"api" | "random">(initialMode);
+  const [dataMode, setDataMode] = useState<"season" | "pre-event" | "post-event">(initialDataMode);
   const [isSearchPending, startSearchTransition] = useTransition();
   const [isSelectPending, startSelectTransition] = useTransition();
   const [pendingEventCode, setPendingEventCode] = useState<string | null>(null);
@@ -71,10 +74,11 @@ export default function SimulateControls({
     return `${pathname}${query ? `?${query}` : ""}`;
   }, [pathname, searchParams]);
 
-  function buildUrl(overrides: { eventCode?: string; mode?: "api" | "random" } = {}) {
+  function buildUrl(overrides: { eventCode?: string; mode?: "api" | "random"; dataMode?: "season" | "pre-event" | "post-event" } = {}) {
     const resolvedMode = overrides.mode ?? mode;
+    const resolvedDataMode = overrides.dataMode ?? dataMode;
     const resolvedEventCode = overrides.eventCode ?? selectedCode ?? "";
-    const base = `/simulate?season=${encodeURIComponent(season)}&eventQuery=${encodeURIComponent(eventQuery.trim())}&runs=${encodeURIComponent(runs || "300")}&mode=${resolvedMode}`;
+    const base = `/simulate?season=${encodeURIComponent(season)}&eventQuery=${encodeURIComponent(eventQuery.trim())}&runs=${encodeURIComponent(runs || "300")}&mode=${resolvedMode}&dataMode=${resolvedDataMode}`;
     return resolvedEventCode ? `${base}&eventCode=${encodeURIComponent(resolvedEventCode)}` : base;
   }
 
@@ -111,36 +115,92 @@ export default function SimulateControls({
     }
   }
 
+  function handleDataModeChange(nextDataMode: "season" | "pre-event" | "post-event") {
+    setDataMode(nextDataMode);
+    if (!selectedCode) return;
+    const url = buildUrl({ dataMode: nextDataMode });
+    if (url !== currentUrl) {
+      startSearchTransition(() => {
+        router.push(url);
+      });
+    }
+  }
+
   return (
     <>
-      {/* Mode toggle */}
-      <div className="mt-5 flex items-center gap-1 rounded-[10px] border border-white/10 bg-[#0b0b0b] p-1 w-fit">
-        <button
-          suppressHydrationWarning
-          type="button"
-          onClick={() => handleModeChange("api")}
-          className={[
-            "rounded-[8px] px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors",
-            mode === "api"
-              ? "bg-white text-black font-semibold"
-              : "text-white/52 hover:text-white/80",
-          ].join(" ")}
-        >
-          API Schedule
-        </button>
-        <button
-          suppressHydrationWarning
-          type="button"
-          onClick={() => handleModeChange("random")}
-          className={[
-            "rounded-[8px] px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors",
-            mode === "random"
-              ? "bg-white text-black font-semibold"
-              : "text-white/52 hover:text-white/80",
-          ].join(" ")}
-        >
-          Random Schedule
-        </button>
+      <div className="mt-5 flex flex-wrap gap-2">
+        {/* Schedule mode toggle */}
+        <div className="flex items-center gap-1 rounded-[10px] border border-white/10 bg-[#0b0b0b] p-1 w-fit">
+          <button
+            suppressHydrationWarning
+            type="button"
+            onClick={() => handleModeChange("api")}
+            className={[
+              "rounded-[8px] px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors",
+              mode === "api"
+                ? "bg-white text-black font-semibold"
+                : "text-white/52 hover:text-white/80",
+            ].join(" ")}
+          >
+            API Schedule
+          </button>
+          <button
+            suppressHydrationWarning
+            type="button"
+            onClick={() => handleModeChange("random")}
+            className={[
+              "rounded-[8px] px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors",
+              mode === "random"
+                ? "bg-white text-black font-semibold"
+                : "text-white/52 hover:text-white/80",
+            ].join(" ")}
+          >
+            Random Schedule
+          </button>
+        </div>
+
+        {/* Data mode toggle */}
+        <div className="flex items-center gap-1 rounded-[10px] border border-white/10 bg-[#0b0b0b] p-1 w-fit">
+          <button
+            suppressHydrationWarning
+            type="button"
+            onClick={() => handleDataModeChange("season")}
+            className={[
+              "rounded-[8px] px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors",
+              dataMode === "season"
+                ? "bg-white text-black font-semibold"
+                : "text-white/52 hover:text-white/80",
+            ].join(" ")}
+          >
+            Season Best
+          </button>
+          <button
+            suppressHydrationWarning
+            type="button"
+            onClick={() => handleDataModeChange("pre-event")}
+            className={[
+              "rounded-[8px] px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors",
+              dataMode === "pre-event"
+                ? "bg-white text-black font-semibold"
+                : "text-white/52 hover:text-white/80",
+            ].join(" ")}
+          >
+            Pre-Event
+          </button>
+          <button
+            suppressHydrationWarning
+            type="button"
+            onClick={() => handleDataModeChange("post-event")}
+            className={[
+              "rounded-[8px] px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors",
+              dataMode === "post-event"
+                ? "bg-white text-black font-semibold"
+                : "text-white/52 hover:text-white/80",
+            ].join(" ")}
+          >
+            Post-Event
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
@@ -211,6 +271,12 @@ export default function SimulateControls({
           {mode === "api"
             ? "Simulates the published qualification schedule using FTC match data."
             : "Generates a random schedule each run — shows expected outcomes independent of draw."}
+          {" "}
+          {dataMode === "pre-event"
+            ? "Strength uses OPR from the team's most recent event before this one — no future data."
+            : dataMode === "post-event"
+              ? "Strength uses OPR computed from this event's own match results — only valid after the event ends."
+              : "Strength uses each team's best per-event OPR across the full season — may include later events."}
         </div>
       </form>
 
