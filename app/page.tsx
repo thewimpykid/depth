@@ -90,7 +90,7 @@ export default async function Home() {
     ftcApiClient.getSeasonSummary().catch(() => ({ teamCount: null as number | null })),
     ftcApiClient.getSeasonEvents().catch(() => ({ events: [] })),
     getSeasonRecords(season, "matches").catch(() => null),
-    getScatterTeams(season, 1000).catch(() => []),
+    getScatterTeams(season, 500).catch(() => []),
   ]);
 
   const events = asArray(seasonEventsResponse.events)

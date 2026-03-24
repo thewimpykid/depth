@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -X POST https://api.ftcscout.org/graphql -H \"Content-Type: application/json\" -d '{\"\"\"\"query\"\"\"\":\"\"\"\"{ tepRecords\\(season: 2025, skip: 0, take: 3000, sortBy: \\\\\"\"\"\"opr.totalPointsNp\\\\\"\"\"\", sortDir: Desc\\) { data { data { teamNumber stats { ... on TeamEventStats2025 { opr { totalPointsNp } } } } } } }\"\"\"\"}')",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); arr=d.get\\(''''data'''',{}\\).get\\(''''tepRecords'''',{}\\).get\\(''''data'''',[]\\); print\\(''''take=3000 results:'''', len\\(arr\\)\\); print\\(''''errors:'''', d.get\\(''''errors''''\\)\\)\")",
+      "Bash(curl --version)"
+    ]
+  }
+}

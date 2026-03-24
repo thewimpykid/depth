@@ -310,7 +310,12 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
     <main className="min-h-screen bg-[#050505] text-white">
       <div className="mx-auto max-w-7xl px-5 py-4 sm:px-8 sm:py-6">
         <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
-          <h1 className="text-2xl font-medium tracking-[-0.05em] text-white sm:text-3xl">Simulate Event</h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl font-medium tracking-[-0.05em] text-white sm:text-3xl">Simulate Event</h1>
+            <Link href="/methodology" className="text-[10px] uppercase tracking-[0.14em] text-white/30 hover:text-white/60 shrink-0">
+              Methodology →
+            </Link>
+          </div>
           <SimulateControls
             key={`simulate-controls:${season}:${eventQuery}:${eventCode}:${simulations}:${scheduleMode}:${dataMode}`}
             initialEventQuery={eventQuery}
@@ -443,7 +448,15 @@ export default async function SimulatePage(props: PageProps<"/simulate">) {
                       <div className="space-y-3">
                         <TeamStrengthChart rows={selectedSimulation.standings} />
                         <section className="rounded-[12px] border border-white/10 bg-[#090909] p-4">
-                          <div className="text-base font-medium text-white">Model notes</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-base font-medium text-white">Model notes</div>
+                            <Link
+                              href="/methodology"
+                              className="text-[10px] uppercase tracking-[0.14em] text-white/30 hover:text-white/60"
+                            >
+                              Full methodology →
+                            </Link>
+                          </div>
                           <div className="mt-2 space-y-1.5 text-xs text-white/54">
                             {selectedSimulation.dataMode === "season" ? (
                               <div>Strength = best per-event OPR across the full season. May include events after this one.</div>

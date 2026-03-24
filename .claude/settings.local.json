@@ -1,7 +1,43 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(curl -s https://api.ftcscout.org/rest/v1/teams/10195/events/2024)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/teams/search?limit=2\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/docs\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/openapi.json\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/swagger.json\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/api-docs\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/seasons/2024/rankings?limit=2\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/teams/search?season=2024&limit=2\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/seasons\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/teams/1/stats?season=2024\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/teams/1?season=2024\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/leaderboards?season=2024&limit=2\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/opr?season=2024&limit=2\")",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/2024/teams/stats?limit=2\")",
+      "Bash(curl -v \"https://api.ftcscout.org/rest/v1/teams/search\")",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"\"\"query\"\"\"\":\"\"\"\"{ __schema { queryType { fields { name description } } } }\"\"\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"\"\"query\"\"\"\":\"\"\"\"{ tepRecords\\(season: 2024, limit: 2, sortBy: \\\\\"\"\"\"tot\\\\\"\"\"\", sortDir: Desc\\) { data { teamNumber team { name } stats { tot { value rank } } } } }\"\"\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ __type\\(name: \\\\\"\"Query\\\\\"\"\\) { fields { name args { name type { name kind ofType { name kind } } } } } }\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ __type\\(name: \\\\\"\"TepRecordRow\\\\\"\"\\) { fields { name type { name kind ofType { name kind } } } } }\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ __type\\(name: \\\\\"\"TeamEventParticipation\\\\\"\"\\) { fields { name type { name kind ofType { name kind } } } } }\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ __type\\(name: \\\\\"\"TeamEventStats\\\\\"\"\\) { possibleTypes { name fields { name type { name kind } } } } }\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ __type\\(name: \\\\\"\"TeamEventStats2024\\\\\"\"\\) { fields { name type { name kind ofType { name kind ofType { name kind } } } } } }\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ tepRecords\\(season: 2024, skip: 0, take: 2, sortBy: \\\\\"\"opr.tot\\\\\"\", sortDir: Desc\\) { data { teamNumber team { name } stats { ... on TeamEventStats2024 { opr { value rank } tot { value rank } } } } } }\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ __type\\(name: \\\\\"\"TeamEventStats2024Group\\\\\"\"\\) { fields { name type { name kind } } } }\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ tepRecords\\(season: 2024, skip: 0, take: 2, sortBy: \\\\\"\"opr.totalPoints\\\\\"\", sortDir: Desc\\) { data { data { teamNumber team { name } stats { ... on TeamEventStats2024 { opr { totalPoints } } } } noFilterRank } } }\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/graphql\" -X POST -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ __type\\(name: \\\\\"\"TepRecords\\\\\"\"\\) { fields { name type { name kind ofType { name kind } } } } }\"\"}')",
+      "Bash(curl -s \"https://api.ftcscout.org/rest/v1/teams/search?limit=3&query=254\")",
+      "Bash(curl -s \"https://ftc-api.firstinspires.org/v2.0/2025/events?pageSize=1\" -H \"Accept: application/json\")",
+      "Bash(curl -s -X POST \"https://api.ftcscout.org/graphql\" -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ tepRecords\\(season: 2025, skip: 0, take: 5, sortBy: \\\\\"\"opr.totalPointsNp\\\\\"\", sortDir: Desc\\) { data { data { teamNumber team { name } stats { __typename } } } } }\"\"}')",
+      "Bash(curl -s -X POST \"https://api.ftcscout.org/graphql\" -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ tepRecords\\(season: 2024, skip: 0, take: 5, sortBy: \\\\\"\"opr.totalPointsNp\\\\\"\", sortDir: Desc\\) { data { data { teamNumber team { name } stats { __typename } } } } }\"\"}')",
+      "Bash(curl -s -X POST \"https://api.ftcscout.org/graphql\" -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ tepRecords\\(season: 2025, skip: 0, take: 5, sortBy: \\\\\"\"opr.totalPointsNp\\\\\"\", sortDir: Desc\\) { data { data { teamNumber stats { ... on TeamEventStats2025 { opr { totalPointsNp autoPoints dcPoints } } } } } } }\"\"}')",
+      "Bash(curl -s -X POST \"https://api.ftcscout.org/graphql\" -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ __type\\(name: \\\\\"\"TeamEventStats2025\\\\\"\"\\) { fields { name type { name kind ofType { name kind } } } } }\"\"}')",
+      "Bash(curl -s -X POST \"https://api.ftcscout.org/graphql\" -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ __type\\(name: \\\\\"\"TeamEventStats2024\\\\\"\"\\) { fields { name type { name kind ofType { name kind } } } } }\"\"}')",
+      "Bash(curl -s -X POST \"https://api.ftcscout.org/graphql\" -H \"Content-Type: application/json\" -d '{\"\"query\"\":\"\"{ __type\\(name: \\\\\"\"TeamEventStats2025Group\\\\\"\"\\) { fields { name type { name kind ofType { name kind } } } } }\"\"}')"
     ]
   }
 }

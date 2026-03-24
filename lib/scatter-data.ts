@@ -1,13 +1,11 @@
 import "server-only";
 
-import { ftcApiClient } from "@/lib/ftc-api-client";
-import { ftcScoutApiClient } from "@/lib/ftcscout-api-client";
 import { cacheManager } from "@/lib/cache-manager";
 import type { ScatterTeam } from "@/app/opr-scatter";
 
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
+const FTCSCOUT_GRAPHQL =
+  process.env.FTCSCOUT_GRAPHQL_URL?.replace(/\/+$/, "") ??
+  "https://api.ftcscout.org/graphql";
 
 function asObject(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -19,104 +17,142 @@ function asNumber(value: unknown): number | null {
   return null;
 }
 
-function pickNumber(obj: Record<string, unknown> | null, keys: string[]): number | null {
-  if (!obj) return null;
-  for (const key of keys) {
-    const v = asNumber(obj[key]);
-    if (v !== null) return v;
-  }
-  return null;
+function asString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
 }
 
-function pickString(obj: Record<string, unknown> | null, keys: string[]): string | null {
-  if (!obj) return null;
-  for (const key of keys) {
-    if (typeof obj[key] === "string") return obj[key] as string;
+/** Fetch one page (50 records max) of TEP records sorted by NP OPR desc. */
+async function fetchTepPage(
+  season: number,
+  skip: number,
+  statsType: string,
+): Promise<ScatterTeam[]> {
+  const query = `{
+    tepRecords(season: ${season}, skip: ${skip}, take: 50, sortBy: "opr.totalPointsNp", sortDir: Desc) {
+      data {
+        data {
+          teamNumber
+          team { name }
+          stats {
+            ... on ${statsType} {
+              opr { totalPointsNp autoPoints dcPoints }
+            }
+          }
+        }
+      }
+    }
+  }`;
+
+  const resp = await fetch(FTCSCOUT_GRAPHQL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+    cache: "no-store",
+  });
+
+  if (!resp.ok) return [];
+
+  const json = asObject(await resp.json());
+  const tepData = asObject(json?.data);
+  const tepRecords = asObject(tepData?.tepRecords);
+  const rows = Array.isArray(tepRecords?.data) ? (tepRecords.data as unknown[]) : [];
+
+  const teams: ScatterTeam[] = [];
+  for (const row of rows) {
+    const rowObj = asObject(row);
+    const d = asObject(rowObj?.data);
+    if (!d) continue;
+
+    const teamNumber = asNumber(d.teamNumber);
+    if (teamNumber === null) continue;
+
+    const teamObj = asObject(d.team);
+    const teamName = asString(teamObj?.name);
+
+    const statsObj = asObject(d.stats);
+    const oprObj = asObject(statsObj?.opr);
+    if (!oprObj) continue;
+
+    const npOpr = asNumber(oprObj.totalPointsNp);
+    const autoOpr = asNumber(oprObj.autoPoints);
+    const teleopOpr = asNumber(oprObj.dcPoints);
+    if (npOpr === null || autoOpr === null || teleopOpr === null) continue;
+
+    teams.push({ teamNumber, teamName, npOpr, autoOpr, teleopOpr });
   }
-  return null;
+
+  return teams;
 }
 
-type TeamEntry = { number: number; name: string | null };
+/** Run async tasks with at most `concurrency` in flight at once. */
+async function mapConcurrent<T>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<ScatterTeam[]>,
+): Promise<ScatterTeam[][]> {
+  const results: ScatterTeam[][] = new Array(items.length);
+  let idx = 0;
 
-async function getAllSeasonTeamNumbers(season: number): Promise<TeamEntry[]> {
-  const cacheKey = `all-teams-${season}`;
-  const cached = cacheManager.get<TeamEntry[]>("scatter", cacheKey);
-  if (cached) return cached;
-
-  const firstPage = await ftcApiClient.getTeamIndexPage(season, 1);
-  const allRaw: unknown[] = [...asArray(firstPage.teams)];
-  const pageTotal = Math.min(firstPage.pageTotal ?? 1, 300);
-
-  if (pageTotal > 1) {
-    const remaining = await Promise.all(
-      Array.from({ length: pageTotal - 1 }, (_, i) => i + 2).map((p) =>
-        ftcApiClient
-          .getTeamIndexPage(season, p)
-          .then((r) => asArray(r.teams))
-          .catch(() => [] as unknown[]),
-      ),
-    );
-    for (const page of remaining) allRaw.push(...page);
-  }
-
-  const result: TeamEntry[] = allRaw
-    .map(asObject)
-    .filter((t): t is Record<string, unknown> => t !== null)
-    .map((t) => ({
-      number: pickNumber(t, ["teamNumber", "number"]) ?? 0,
-      name: pickString(t, ["nameShort", "name", "schoolName"]),
-    }))
-    .filter((t) => t.number > 0);
-
-  cacheManager.set("scatter", cacheKey, result, 3600);
-  return result;
-}
-
-export async function getScatterTeams(season: number, target: number): Promise<ScatterTeam[]> {
-  const cacheKey = `scatter-data-${season}-${target}`;
-  const cached = cacheManager.get<ScatterTeam[]>("scatter", cacheKey);
-  if (cached) return cached;
-
-  const allTeams = await getAllSeasonTeamNumbers(season);
-  if (allTeams.length === 0) return [];
-
-  // Uniform sample across the full team list
-  const sample: TeamEntry[] = [];
-  const step = Math.max(1, allTeams.length / target);
-  for (let i = 0; i < target; i++) {
-    const idx = Math.round(i * step);
-    if (idx >= allTeams.length) break;
-    sample.push(allTeams[idx]);
-  }
-
-  // Batch-fetch quick stats 50 at a time
-  const BATCH = 50;
-  const scatterTeams: ScatterTeam[] = [];
-
-  for (let i = 0; i < sample.length; i += BATCH) {
-    const batch = sample.slice(i, i + BATCH);
-    const settled = await Promise.allSettled(
-      batch.map((t) => ftcScoutApiClient.getTeamQuickStats(t.number, season)),
-    );
-
-    for (let j = 0; j < batch.length; j++) {
-      const r = settled[j];
-      if (r.status !== "fulfilled") continue;
-      const stats = r.value;
-      const npOpr = stats.tot?.value;
-      const autoOpr = stats.auto?.value;
-      const teleopOpr = stats.dc?.value;
-      if (npOpr == null || autoOpr == null || teleopOpr == null) continue;
-      scatterTeams.push({
-        teamNumber: batch[j].number,
-        teamName: batch[j].name,
-        npOpr,
-        autoOpr,
-        teleopOpr,
-      });
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++;
+      try {
+        results[i] = await fn(items[i]);
+      } catch {
+        results[i] = [];
+      }
     }
   }
 
-  cacheManager.set("scatter", cacheKey, scatterTeams, 1800);
-  return scatterTeams;
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  return results;
+}
+
+/**
+ * Fetch the top `target` teams by NP OPR for `season` from FTCScout.
+ *
+ * FTCScout caps each tepRecords request at 50 records, so we paginate.
+ * Top teams appear once per event they competed in, so we oversample by 8×
+ * to collect enough unique teams, then deduplicate keeping the best NP OPR
+ * per team and return the top `target`.
+ */
+async function fetchTopTeamsByOpr(
+  season: number,
+  target: number,
+): Promise<ScatterTeam[]> {
+  const statsType = `TeamEventStats${season}`;
+  const totalRecords = Math.min(target * 8, 4000);
+  const pageCount = Math.ceil(totalRecords / 50);
+  const skips = Array.from({ length: pageCount }, (_, i) => i * 50);
+
+  // Fetch pages with concurrency=10 to avoid hammering FTCScout.
+  const pages = await mapConcurrent(skips, 10, (skip) =>
+    fetchTepPage(season, skip, statsType),
+  );
+
+  // Deduplicate by team number, keeping highest NP OPR.
+  const best = new Map<number, ScatterTeam>();
+  for (const page of pages) {
+    for (const team of page) {
+      const existing = best.get(team.teamNumber);
+      if (!existing || team.npOpr > existing.npOpr) {
+        best.set(team.teamNumber, team);
+      }
+    }
+  }
+
+  return Array.from(best.values())
+    .sort((a, b) => b.npOpr - a.npOpr)
+    .slice(0, target);
+}
+
+export async function getScatterTeams(season: number, target: number): Promise<ScatterTeam[]> {
+  // Cache key version suffix forces a fresh fetch when logic changes.
+  const cacheKey = `scatter-v3-${season}-${target}`;
+  const cached = cacheManager.get<ScatterTeam[]>("scatter", cacheKey);
+  if (cached) return cached;
+
+  const result = await fetchTopTeamsByOpr(season, target);
+  cacheManager.set("scatter", cacheKey, result, 1800);
+  return result;
 }

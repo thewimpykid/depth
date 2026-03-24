@@ -2,6 +2,7 @@ import "server-only";
 
 import { cacheManager, CACHE_TTL } from "@/lib/cache-manager";
 import { ftcApiClient } from "@/lib/ftc-api-client";
+import { ftcScoutApiClient } from "@/lib/ftcscout-api-client";
 import type { TeamSnapshot } from "@/lib/team-analysis";
 
 export type EventSearchResult = {
@@ -88,6 +89,8 @@ type WorkingStanding = {
   losses: number;
   ties: number;
   scoreFor: number;
+  /** FTC tiebreaker: sum of the losing alliance's score in each match played. */
+  tbp: number;
 };
 
 function asObject(value: unknown): Record<string, unknown> | null {
@@ -351,6 +354,7 @@ function createWorkingStandings(teams: TeamSnapshot[]) {
       losses: 0,
       ties: 0,
       scoreFor: 0,
+      tbp: 0,
     });
   }
 
@@ -365,12 +369,15 @@ function applyResult(
 ) {
   const won = scoreFor > scoreAgainst;
   const lost = scoreFor < scoreAgainst;
+  // FTC tiebreaker: sum of the losing alliance's score in each match played.
+  const loserScore = Math.min(scoreFor, scoreAgainst);
 
   for (const team of teams) {
     const row = standings.get(team.teamNumber);
     if (!row) continue;
 
     row.scoreFor += scoreFor;
+    row.tbp += loserScore;
     if (won) {
       row.wins += 1;
     } else if (lost) {
@@ -384,8 +391,7 @@ function applyResult(
 function sortStandings(rows: WorkingStanding[]) {
   return [...rows].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
-    if (b.ties !== a.ties) return b.ties - a.ties;
-    if (b.scoreFor !== a.scoreFor) return b.scoreFor - a.scoreFor;
+    if (b.tbp !== a.tbp) return b.tbp - a.tbp;
     return a.teamNumber - b.teamNumber;
   });
 }
@@ -473,226 +479,123 @@ function simulatePlayoffs(
   return results;
 }
 
-// Lightweight match score record used for OPR computation.
-type MatchScore = {
-  redTeams: number[];
-  blueTeams: number[];
-  redScore: number | null;
-  blueScore: number | null;
-};
-
-function parseMatchScores(rawRows: unknown[]): MatchScore[] {
-  return rawRows
-    .map((rawRow) => {
-      const obj = asObject(rawRow);
-      if (!obj) return null;
-      const { redAlliance, blueAlliance } = getAllianceTeams(asArray(obj.teams));
-      return {
-        redTeams: redAlliance.map((t) => t.teamNumber),
-        blueTeams: blueAlliance.map((t) => t.teamNumber),
-        redScore: pickNumber(obj, ["scoreRedFinal", "redScoreFinal", "scoreRed"]),
-        blueScore: pickNumber(obj, ["scoreBlueFinal", "blueScoreFinal", "scoreBlue"]),
-      };
-    })
-    .filter(
-      (m): m is MatchScore =>
-        m !== null && m.redTeams.length >= 2 && m.blueTeams.length >= 2,
-    );
-}
-
-/**
- * Solve Ax = b via Gauss-Jordan elimination with partial pivoting.
- * Returns the solution vector; entries are 0 for linearly dependent rows.
- */
-function solveLinearSystem(A: number[][], b: number[]): number[] {
-  const n = A.length;
-  const M = A.map((row, i) => [...row, b[i]]);
-
-  for (let col = 0; col < n; col++) {
-    let maxRow = col;
-    for (let row = col + 1; row < n; row++) {
-      if (Math.abs(M[row][col]) > Math.abs(M[maxRow][col])) maxRow = row;
-    }
-    [M[col], M[maxRow]] = [M[maxRow], M[col]];
-
-    if (Math.abs(M[col][col]) < 1e-10) continue;
-
-    for (let row = 0; row < n; row++) {
-      if (row === col || Math.abs(M[row][col]) < 1e-14) continue;
-      const factor = M[row][col] / M[col][col];
-      for (let k = col; k <= n; k++) M[row][k] -= factor * M[col][k];
-    }
-  }
-
-  return Array.from({ length: n }, (_, i) =>
-    Math.abs(M[i][i]) < 1e-10 ? 0 : M[i][n] / M[i][i],
-  );
-}
-
-/**
- * Compute OPR for a set of teams from their match results via least squares.
- * Uses the normal equations: (AᵀA)x = Aᵀb where A is the alliance membership
- * matrix and b is the alliance score vector.
- */
-function solveOpr(teamNumbers: number[], matches: MatchScore[]): Map<number, number> {
-  const n = teamNumbers.length;
-  if (n === 0) return new Map();
-
-  const idx = new Map(teamNumbers.map((t, i) => [t, i]));
-  const AtA = Array.from({ length: n }, () => new Array<number>(n).fill(0));
-  const Atb = new Array<number>(n).fill(0);
-
-  for (const match of matches) {
-    if (match.redScore === null || match.blueScore === null) continue;
-    for (const [teamsList, score] of [
-      [match.redTeams, match.redScore] as const,
-      [match.blueTeams, match.blueScore] as const,
-    ]) {
-      const indices = teamsList
-        .map((t) => idx.get(t))
-        .filter((i): i is number => i !== undefined);
-      for (const i of indices) {
-        Atb[i] += score;
-        for (const j of indices) AtA[i][j] += 1;
-      }
-    }
-  }
-
-  const x = solveLinearSystem(AtA, Atb);
-  const result = new Map<number, number>();
-  teamNumbers.forEach((t, i) => result.set(t, round(Math.max(0, x[i]))));
-  return result;
-}
-
-/** Fetch an event's full team list + qual match scores and return NP OPR per team. */
-async function computeEventOpr(eventCode: string, season: number): Promise<Map<number, number>> {
-  const [teamsResp, schedResp] = await Promise.all([
-    ftcApiClient.getEventTeams(eventCode, season).catch(() => ({ teams: [] })),
-    ftcApiClient.getHybridSchedule(eventCode, "qual", { season }).catch(() => ({ schedule: [] })),
-  ]);
-
-  const teamNumbers = asArray(teamsResp.teams)
-    .map((t) => {
-      const obj = asObject(t);
-      return obj ? pickNumber(obj, ["teamNumber", "number"]) : null;
-    })
-    .filter((n): n is number => n !== null);
-
-  const matches = parseMatchScores(asArray(schedResp.schedule));
-  return solveOpr(teamNumbers, matches);
-}
-
 type StrengthResult = { strength: number | null; isFirstEvent: boolean };
 
+type FtcScoutEventEntry = {
+  eventCode: string;
+  npOpr: number | null;
+};
+
 /**
- * Pre-event mode: for each team, find their most recent event that ended before
- * `beforeDate`, compute OPR at that event, and return that OPR as their strength.
+ * Parse the FTCScout /teams/{n}/events/{season} response.
+ * Response is a plain array: [{ eventCode, stats: { opr: { totalPointsNp } } }]
  */
+function parseFtcScoutTeamEvents(raw: unknown): FtcScoutEventEntry[] {
+  const items = Array.isArray(raw) ? raw : asArray(asObject(raw)?.value ?? []);
+  return items
+    .map((item) => {
+      const entry = asObject(item);
+      if (!entry) return null;
+      const code = pickString(entry, ["eventCode", "code"]);
+      if (!code) return null;
+      const stats = asObject(entry.stats);
+      const opr = asObject(stats?.opr);
+      return {
+        eventCode: code,
+        npOpr: opr ? pickNumber(opr, ["totalPointsNp"]) : null,
+      };
+    })
+    .filter((e): e is FtcScoutEventEntry => e !== null);
+}
+
+/**
+ * Fetch per-event NP OPR for a team from FTCScout, keyed by event code (uppercase).
+ * Returns an empty map on failure.
+ */
+async function getFtcScoutOprByEvent(
+  teamNumber: number,
+  season: number,
+): Promise<Map<string, number>> {
+  const resp = await ftcScoutApiClient.getTeamEvents(teamNumber, season).catch(() => null);
+  const entries = parseFtcScoutTeamEvents(resp);
+  const map = new Map<string, number>();
+  for (const e of entries) {
+    if (e.npOpr !== null) map.set(e.eventCode.toUpperCase(), e.npOpr);
+  }
+  return map;
+}
+
+/** Pre-event: OPR from the team's most recent event ending before `beforeDate`. */
 async function computePreEventStrengths(
   teams: TeamProfile[],
   season: number,
   beforeDate: string,
 ): Promise<Map<number, StrengthResult>> {
   const beforeTime = new Date(beforeDate).getTime();
+  const results = new Map<number, StrengthResult>();
 
-  // Per team: find the most recent prior event (sorted desc by end date).
-  const teamMostRecentCode = new Map<number, string | null>();
   await mapWithConcurrency(teams, 8, async (team) => {
-    const resp = await ftcApiClient
-      .getTeamEvents(team.teamNumber, season)
-      .catch(() => ({ events: [] }));
-    const prior = asArray(resp.events)
+    // FTC API provides event dates; FTCScout provides per-event OPR.
+    const [ftcResp, oprByEvent] = await Promise.all([
+      ftcApiClient.getTeamEvents(team.teamNumber, season).catch(() => ({ events: [] })),
+      getFtcScoutOprByEvent(team.teamNumber, season),
+    ]);
+
+    const priorEvents = asArray(ftcResp.events)
       .map(normalizeEvent)
       .filter((e): e is EventSearchResult => e !== null)
       .filter((e) => {
         const end = e.end ?? e.start;
         return end !== null && new Date(end).getTime() < beforeTime;
       })
-      .sort((a, b) => new Date(b.end ?? b.start ?? "").getTime() - new Date(a.end ?? a.start ?? "").getTime());
-    teamMostRecentCode.set(team.teamNumber, prior[0]?.code ?? null);
-  });
+      .sort((a, b) =>
+        new Date(b.end ?? b.start ?? "").getTime() - new Date(a.end ?? a.start ?? "").getTime(),
+      );
 
-  // Compute OPR once per unique prior event code.
-  const uniqueCodes = new Set<string>();
-  for (const code of teamMostRecentCode.values()) if (code) uniqueCodes.add(code);
-
-  const oprByEvent = new Map<string, Map<number, number>>();
-  await mapWithConcurrency([...uniqueCodes], 4, async (code) => {
-    oprByEvent.set(code, await computeEventOpr(code, season).catch(() => new Map()));
-  });
-
-  const results = new Map<number, StrengthResult>();
-  for (const team of teams) {
-    const code = teamMostRecentCode.get(team.teamNumber) ?? null;
+    const mostRecent = priorEvents.find((e) => oprByEvent.has(e.code.toUpperCase())) ?? null;
     results.set(team.teamNumber, {
-      strength: code ? (oprByEvent.get(code)?.get(team.teamNumber) ?? null) : null,
-      isFirstEvent: code === null,
+      strength: mostRecent ? (oprByEvent.get(mostRecent.code.toUpperCase()) ?? null) : null,
+      isFirstEvent: mostRecent === null,
     });
-  }
+  });
   return results;
 }
 
-/**
- * Post-event mode: compute OPR from this event's own match results.
- * Only useful after the event has finished.
- */
+/** Post-event: NP OPR from this event's own results, as computed by FTCScout. */
 async function computePostEventStrengths(
   eventCode: string,
   season: number,
   teams: TeamProfile[],
 ): Promise<Map<number, StrengthResult>> {
-  const opr = await computeEventOpr(eventCode, season).catch(() => new Map<number, number>());
+  const upperCode = eventCode.toUpperCase();
   const results = new Map<number, StrengthResult>();
-  for (const team of teams) {
+  await mapWithConcurrency(teams, 8, async (team) => {
+    const oprByEvent = await getFtcScoutOprByEvent(team.teamNumber, season);
     results.set(team.teamNumber, {
-      strength: opr.get(team.teamNumber) ?? null,
+      strength: oprByEvent.get(upperCode) ?? null,
       isFirstEvent: false,
     });
-  }
+  });
   return results;
 }
 
-/**
- * Season mode: for each team, compute OPR at every event they attended this season
- * and use their best (highest) result as their strength.
- */
+/** Season best: highest per-event NP OPR across all events the team played this season. */
 async function computeFullSeasonBestStrengths(
   teams: TeamProfile[],
   season: number,
 ): Promise<Map<number, StrengthResult>> {
-  // Collect all season events per team.
-  const teamEventCodes = new Map<number, string[]>();
-  await mapWithConcurrency(teams, 8, async (team) => {
-    const resp = await ftcApiClient
-      .getTeamEvents(team.teamNumber, season)
-      .catch(() => ({ events: [] }));
-    const codes = asArray(resp.events)
-      .map(normalizeEvent)
-      .filter((e): e is EventSearchResult => e !== null)
-      .map((e) => e.code);
-    teamEventCodes.set(team.teamNumber, codes);
-  });
-
-  // Compute OPR once per unique event.
-  const uniqueCodes = new Set<string>();
-  for (const codes of teamEventCodes.values()) for (const c of codes) uniqueCodes.add(c);
-
-  const oprByEvent = new Map<string, Map<number, number>>();
-  await mapWithConcurrency([...uniqueCodes], 4, async (code) => {
-    oprByEvent.set(code, await computeEventOpr(code, season).catch(() => new Map()));
-  });
-
-  // Per team: best (max) OPR across all their events.
   const results = new Map<number, StrengthResult>();
-  for (const team of teams) {
-    const codes = teamEventCodes.get(team.teamNumber) ?? [];
+  await mapWithConcurrency(teams, 8, async (team) => {
+    const oprByEvent = await getFtcScoutOprByEvent(team.teamNumber, season);
     let best: number | null = null;
-    for (const code of codes) {
-      const opr = oprByEvent.get(code)?.get(team.teamNumber);
-      if (opr !== undefined && (best === null || opr > best)) best = opr;
+    for (const opr of oprByEvent.values()) {
+      if (best === null || opr > best) best = opr;
     }
-    results.set(team.teamNumber, { strength: best, isFirstEvent: codes.length === 0 });
-  }
+    results.set(team.teamNumber, {
+      strength: best,
+      isFirstEvent: best === null,
+    });
+  });
   return results;
 }
 
@@ -927,6 +830,7 @@ export async function simulateActualEvent(
       row.losses = locked.losses;
       row.ties = locked.ties;
       row.scoreFor = locked.scoreFor;
+      row.tbp = locked.tbp;
     }
 
     for (const match of remainingMatches) {
