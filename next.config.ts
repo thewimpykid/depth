@@ -9,6 +9,15 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: configDir,
   },
+  async redirects() {
+    return [
+      {
+        source: "/cord",
+        destination: "/",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
