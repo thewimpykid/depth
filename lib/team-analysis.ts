@@ -268,7 +268,7 @@ async function fetchTeamSnapshot(
   currentSeason: number,
 ): Promise<TeamSnapshot> {
   const cacheKey = `snapshot:${season}:${teamNumber}`;
-  const cached = cacheManager.get<TeamSnapshot>("analysis", cacheKey);
+  const cached = await cacheManager.get<TeamSnapshot>("analysis", cacheKey);
   if (cached) {
     return cached;
   }

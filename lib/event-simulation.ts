@@ -606,7 +606,7 @@ async function getEventTeamSnapshots(
   priorToDate?: string | null,
 ): Promise<TeamSnapshot[]> {
   const cacheKey = `event-roster-${mode}:${season}:${eventCode.toUpperCase()}`;
-  const cached = cacheManager.get<TeamSnapshot[]>("analysis", cacheKey);
+  const cached = await cacheManager.get<TeamSnapshot[]>("analysis", cacheKey);
   if (cached) return cached;
 
   const eventTeamsResponse = await ftcApiClient.getEventTeams(eventCode, season);

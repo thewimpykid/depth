@@ -581,7 +581,7 @@ async function fetchRecordsPage(
 
 export async function getSeasonRecords(season: number, view: SeasonRecordsView) {
   const cacheKey = `${season}:${view}`;
-  const cached = cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
+  const cached = await cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
   if (cached) return cached;
 
   const dataset = (await fetchRecordsPage(season, view, 0)) ?? { count: 0, rows: [] };
@@ -595,7 +595,7 @@ export async function getSeasonRecordsTopN(
   target: number,
 ): Promise<SeasonRecordsDataset> {
   const cacheKey = `top${target}:${season}:${view}`;
-  const cached = cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
+  const cached = await cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
   if (cached) return cached;
 
   // Fetch first page to discover page size and total count

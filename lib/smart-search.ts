@@ -180,7 +180,7 @@ function scoreEntry(haystack: string, exactKey: string, query: string, secondary
 
 async function getTeamIndex(season: number): Promise<TeamIndexEntry[]> {
   const cacheKey = `team-index-${season}`;
-  const cached = cacheManager.get<TeamIndexEntry[]>("search-index", cacheKey);
+  const cached = await cacheManager.get<TeamIndexEntry[]>("search-index", cacheKey);
   if (cached !== null) return cached;
 
   const firstPage = await ftcApiClient.getTeamIndexPage(season, 1);

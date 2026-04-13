@@ -149,7 +149,7 @@ async function fetchTopTeamsByOpr(
 export async function getScatterTeams(season: number, target: number): Promise<ScatterTeam[]> {
   // Cache key version suffix forces a fresh fetch when logic changes.
   const cacheKey = `scatter-v3-${season}-${target}`;
-  const cached = cacheManager.get<ScatterTeam[]>("scatter", cacheKey);
+  const cached = await cacheManager.get<ScatterTeam[]>("scatter", cacheKey);
   if (cached) return cached;
 
   const result = await fetchTopTeamsByOpr(season, target);

@@ -43,7 +43,7 @@ class FTCScoutApiClient {
     const requestKey = `${namespace}:${identifier}`;
 
     if (!options?.bypassCache) {
-      const cached = cacheManager.get<T>(namespace, identifier);
+      const cached = await cacheManager.get<T>(namespace, identifier);
       if (cached !== null) {
         return cached;
       }

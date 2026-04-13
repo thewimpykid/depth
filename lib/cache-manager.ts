@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getFromSupabase, setInSupabase } from "./supabase-cache";
+
 type CacheEntry<T> = {
   data: T;
   timestamp: number;
@@ -25,6 +27,19 @@ export const CACHE_TTL = {
   SCORES: 30,
 } as const;
 
+// Namespaces that survive server restarts via Supabase.
+// Excludes live data (schedule, scores) with short TTLs.
+const PERSISTENT_NAMESPACES = new Set([
+  "scatter",
+  "ftcscout-records",
+  "search-index",
+  "meta",
+  "ftcscout",
+  "events",
+  "teams",
+  "teams-index",
+]);
+
 function getCacheKey(namespace: string, identifier: string) {
   return `depth:${namespace}:${identifier}`;
 }
@@ -42,21 +57,35 @@ function cleanupExpired() {
 }
 
 export const cacheManager = {
-  get<T>(namespace: string, identifier: string): T | null {
+  async get<T>(namespace: string, identifier: string): Promise<T | null> {
     cleanupExpired();
 
-    const cached = memoryCache.get(getCacheKey(namespace, identifier));
-    if (!cached || !isValid(cached)) return null;
+    const key = getCacheKey(namespace, identifier);
+    const cached = memoryCache.get(key);
+    if (cached && isValid(cached)) return cached.data as T;
 
-    return cached.data as T;
+    if (PERSISTENT_NAMESPACES.has(namespace)) {
+      const remote = await getFromSupabase<T>(key);
+      if (remote !== null) {
+        memoryCache.set(key, {
+          data: remote.data,
+          timestamp: Date.now(),
+          ttl: remote.remainingTtl,
+        });
+        return remote.data;
+      }
+    }
+
+    return null;
   },
 
   set<T>(namespace: string, identifier: string, data: T, ttl: number) {
-    memoryCache.set(getCacheKey(namespace, identifier), {
-      data,
-      timestamp: Date.now(),
-      ttl,
-    });
+    const key = getCacheKey(namespace, identifier);
+    memoryCache.set(key, { data, timestamp: Date.now(), ttl });
+
+    if (PERSISTENT_NAMESPACES.has(namespace)) {
+      setInSupabase(key, data, ttl);
+    }
   },
 
   invalidate(namespace: string, identifier: string) {
