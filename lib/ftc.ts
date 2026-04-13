@@ -59,12 +59,18 @@ export type OprTrendPoint = {
   endgame: number | null;
 };
 
+export type ScheduleStrength = {
+  avgOpponentOpr: number;
+  label: "Easy" | "Average" | "Competitive" | "Tough";
+};
+
 export type TeamEventDetails = {
   eventCode: string;
   awards: string[];
   currentOpr: OprBreakdown | null;
   oprTrend: OprTrendPoint[];
   matches: TeamMatch[];
+  scheduleStrength: ScheduleStrength | null;
 };
 
 export type TeamEventSummary = {
@@ -1116,6 +1122,35 @@ export async function getTeamEventDetails(
   const currentOpr = mapToBreakdown(currentBundle, teamNumber);
   const oprTrend = buildOprTrend(playedQualificationMatches, teamNumber);
 
+  // Schedule strength: average OPR of every unique opponent this team faced in quals,
+  // rated relative to the event's own OPR distribution.
+  let scheduleStrength: ScheduleStrength | null = null;
+  if (currentBundle.total.size > 0) {
+    const opponentNumbers = new Set<number>();
+    for (const match of playedQualificationMatches) {
+      if (match.redTeamNumbers.includes(teamNumber)) {
+        match.blueTeamNumbers.forEach((n) => opponentNumbers.add(n));
+      } else if (match.blueTeamNumbers.includes(teamNumber)) {
+        match.redTeamNumbers.forEach((n) => opponentNumbers.add(n));
+      }
+    }
+    const opponentOprs = [...opponentNumbers]
+      .map((n) => currentBundle.total.get(n))
+      .filter((v): v is number => v !== undefined);
+
+    if (opponentOprs.length >= 2) {
+      const avgOpponentOpr = opponentOprs.reduce((a, b) => a + b, 0) / opponentOprs.length;
+      const allOprs = [...currentBundle.total.values()].sort((a, b) => a - b);
+      const at = (frac: number) => allOprs[Math.floor(allOprs.length * frac)] ?? 0;
+      let label: ScheduleStrength["label"];
+      if (avgOpponentOpr < at(0.33)) label = "Easy";
+      else if (avgOpponentOpr < at(0.6)) label = "Average";
+      else if (avgOpponentOpr < at(0.8)) label = "Competitive";
+      else label = "Tough";
+      scheduleStrength = { avgOpponentOpr, label };
+    }
+  }
+
   const qualDisplayRows = mergeScheduleWithResults(
     asArray(qualSchedule.schedule),
     asArray(qualResults.matches),
@@ -1165,5 +1200,6 @@ export async function getTeamEventDetails(
     currentOpr,
     oprTrend,
     matches: addPredictionsToMatches(matches, currentBundle, playedQualificationMatches.length),
+    scheduleStrength,
   };
 }

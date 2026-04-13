@@ -6,6 +6,7 @@ import Link from "next/link";
 import type {
   OprBreakdown,
   OprTrendPoint,
+  ScheduleStrength,
   TeamEventDetails,
   TeamEventSummary,
   TeamMatch,
@@ -374,6 +375,27 @@ function OprTrendChart({ points }: { points: OprTrendPoint[] }) {
   );
 }
 
+const STRENGTH_STYLE: Record<ScheduleStrength["label"], { chip: string; text: string }> = {
+  Easy:        { chip: "bg-emerald-500/10 border-emerald-500/20", text: "text-emerald-400" },
+  Average:     { chip: "bg-sky-500/10 border-sky-500/20",         text: "text-sky-300"     },
+  Competitive: { chip: "bg-amber-400/10 border-amber-400/20",     text: "text-amber-300"   },
+  Tough:       { chip: "bg-red-500/10 border-red-500/20",         text: "text-red-400"     },
+};
+
+function ScheduleStrengthBadge({ ss }: { ss: ScheduleStrength | null }) {
+  if (!ss) return null;
+  const style = STRENGTH_STYLE[ss.label];
+  return (
+    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+      <div className={`inline-flex items-center rounded-[7px] border px-3 py-1.5 ${style.chip}`}>
+        <span className="text-white/45">Schedule Strength</span>
+        <span className={`ml-2 font-semibold ${style.text}`}>{ss.label}</span>
+        <span className="ml-1.5 text-white/30">· {fmtNumber(ss.avgOpponentOpr)} avg opp OPR</span>
+      </div>
+    </div>
+  );
+}
+
 function EventStatsRow({ event }: { event: TeamEventSummary }) {
   if (!event.statsAvailable) return null;
 
@@ -597,6 +619,7 @@ export default function TeamEvents({
 
             <EventStatsRow event={event} />
             <OprChips currentOpr={eventState?.data?.currentOpr ?? null} />
+            <ScheduleStrengthBadge ss={eventState?.data?.scheduleStrength ?? null} />
 
             {eventState?.data?.awards.length ? (
               <div className="mt-3 border-t border-white/10 pt-3 text-xs text-white/70">
