@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+
 import Link from "next/link";
 
 import { ftcApiClient } from "@/lib/ftc-api-client";
@@ -295,6 +297,7 @@ function MatchRecordsTable({ rows, pageOffset }: { rows: MatchSeasonRecordRow[];
 }
 
 export default async function SeasonRecordsPage(props: PageProps<"/season-records">) {
+  notFound();
   const searchParams = await props.searchParams;
   const [currentSeason, seasonSummary] = await Promise.all([
     ftcApiClient.getCurrentSeason(),
