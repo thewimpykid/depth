@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import TeamEvents from "./team-events";
+import { PosterButton } from "./team-poster";
 import type { RankedValue, TeamPageResult } from "@/lib/ftc";
 
 const summaryCache = new Map<string, TeamPageResult>();
@@ -213,6 +214,9 @@ export default function TeamSummary({
             {data.team?.organization ? (
               <div className="mt-1 text-sm text-white/70">{data.team.organization}</div>
             ) : null}
+            <div className="mt-3">
+              <PosterButton data={data} />
+            </div>
           </div>
 
           <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
