@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { ftcApiClient } from "@/lib/ftc-api-client";
 import { getSearchSuggestions, type SearchScope } from "@/lib/smart-search";
 
+export const maxDuration = 30;
+
 function isScope(value: string | null): value is SearchScope {
   return value === "teams" || value === "events" || value === "mixed";
 }

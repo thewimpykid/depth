@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { ftcApiClient } from "@/lib/ftc-api-client";
+
+export const maxDuration = 60;
 import {
   getSeasonRecords,
   type MatchSeasonRecordRow,

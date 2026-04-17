@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getTeamSummaryData } from "@/lib/ftc";
 
+export const maxDuration = 30;
+
 function isValidTeamNumber(value: string) {
   return /^\d{1,5}$/.test(value);
 }
