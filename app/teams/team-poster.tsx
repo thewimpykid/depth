@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 
 type RankedValue = { value: number | null; rank: number | null; percentile: number | null };
 type TeamProfile = {
@@ -101,7 +102,7 @@ function statCard(
 
 /* ── main draw function ── */
 
-function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult) {
+async function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
@@ -210,19 +211,40 @@ function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult) {
     ctx.fillText(`Est. ${data.team.rookieYear}`, lx, 272);
   }
 
+  /* QR code */
+  try {
+    const qrCanvas = document.createElement("canvas");
+    await QRCode.toCanvas(qrCanvas, `https://depthftc.vercel.app/teams?q=${data.teamNumber}`, {
+      width: 72,
+      margin: 1,
+      color: { dark: "#ffffff", light: "#111111" },
+    });
+    rrect(ctx, lx - 3, 283, 78, 78, 6);
+    ctx.fillStyle = "#111111";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.09)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.drawImage(qrCanvas, lx, 286);
+  } catch {
+    /* QR generation failed — skip silently */
+  }
+
   /* Record summary */
   if (data.events.length > 0) {
-    const wins = data.events.reduce(
-      (s, e) => s + (parseInt(e.record?.split("-")[0] ?? "0", 10) || 0), 0,
+    const eventsWithRecord = data.events.filter((e) => e.record !== null);
+    const wins = eventsWithRecord.reduce(
+      (s, e) => s + (parseInt(e.record!.split("-")[0], 10) || 0), 0,
     );
-    const losses = data.events.reduce(
-      (s, e) => s + (parseInt(e.record?.split("-")[1] ?? "0", 10) || 0), 0,
+    const losses = eventsWithRecord.reduce(
+      (s, e) => s + (parseInt(e.record!.split("-")[1], 10) || 0), 0,
     );
+    const recordStr = eventsWithRecord.length > 0 ? `  ·  ${wins}W – ${losses}L` : "";
     ctx.font = `500 11px system-ui, -apple-system, sans-serif`;
     ctx.fillStyle = "rgba(255,255,255,0.32)";
     ctx.fillText(
-      `${data.events.length} event${data.events.length !== 1 ? "s" : ""}  ·  ${wins}W – ${losses}L`,
-      lx, 390,
+      `${data.events.length} event${data.events.length !== 1 ? "s" : ""}${recordStr}`,
+      lx, 395,
     );
   }
 
@@ -334,7 +356,7 @@ function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult) {
   ctx.font = `400 10px system-ui, -apple-system, sans-serif`;
   ctx.fillStyle = "rgba(255,255,255,0.18)";
   ctx.textAlign = "right";
-  ctx.fillText("depthscout.app", W - 20, H - 12);
+  ctx.fillText("depthftc.vercel.app", W - 20, H - 12);
   ctx.textAlign = "left";
 }
 
@@ -346,7 +368,7 @@ export function PosterButton({ data }: { data: TeamPageResult }) {
 
   useEffect(() => {
     if (open && canvasRef.current) {
-      drawPoster(canvasRef.current, data);
+      void drawPoster(canvasRef.current, data);
     }
   }, [open, data]);
 
