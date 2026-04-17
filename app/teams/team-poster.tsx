@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 
+/* ── inline types (no server-only import) ── */
 type RankedValue = { value: number | null; rank: number | null; percentile: number | null };
 type TeamProfile = {
   name: string | null;
@@ -29,6 +30,41 @@ type TeamPageResult = {
   team: TeamProfile | null;
   quickStats: TeamQuickStats | null;
   events: TeamEventSummary[];
+};
+
+/* ── poster customisation types ── */
+
+const COLOR_SCHEMES = {
+  indigo:  { a: "#6366f1", b: "#0ea5e9", glow: "rgba(99,102,241,0.12)"  },
+  crimson: { a: "#ef4444", b: "#f97316", glow: "rgba(239,68,68,0.12)"   },
+  emerald: { a: "#10b981", b: "#06b6d4", glow: "rgba(16,185,129,0.12)"  },
+  violet:  { a: "#8b5cf6", b: "#ec4899", glow: "rgba(139,92,246,0.12)"  },
+  amber:   { a: "#f59e0b", b: "#fbbf24", glow: "rgba(245,158,11,0.12)"  },
+} as const;
+
+type ColorScheme = keyof typeof COLOR_SCHEMES;
+type TeamSide = "none" | "far" | "close" | "hybrid";
+
+interface PosterOptions {
+  colorScheme: ColorScheme;
+  teamSide: TeamSide;
+  showOrg: boolean;
+  showLocation: boolean;
+  showRookieYear: boolean;
+  showQR: boolean;
+  showStats: boolean;
+  showRecord: boolean;
+}
+
+const DEFAULT_OPTS: PosterOptions = {
+  colorScheme: "indigo",
+  teamSide: "none",
+  showOrg: true,
+  showLocation: true,
+  showRookieYear: true,
+  showQR: true,
+  showStats: true,
+  showRecord: true,
 };
 
 /* ── canvas helpers ── */
@@ -100,15 +136,46 @@ function statCard(
   }
 }
 
+function drawSideBadge(ctx: CanvasRenderingContext2D, x: number, y: number, side: Exclude<TeamSide, "none">) {
+  const configs = {
+    far:    { bg: "rgba(245,158,11,0.15)",  border: "rgba(245,158,11,0.35)",  text: "#fbbf24", dot: "#f59e0b", label: "FAR SIDE"   },
+    close:  { bg: "rgba(99,102,241,0.15)",  border: "rgba(99,102,241,0.35)",  text: "#a5b4fc", dot: "#6366f1", label: "CLOSE SIDE" },
+    hybrid: { bg: "rgba(139,92,246,0.15)", border: "rgba(139,92,246,0.35)", text: "#c4b5fd", dot: "#8b5cf6", label: "HYBRID"     },
+  } as const;
+
+  const c = configs[side];
+
+  ctx.font = `600 9px system-ui, -apple-system, sans-serif`;
+  const textW = ctx.measureText(c.label).width;
+  const badgeW = textW + 26;
+  const badgeH = 20;
+
+  rrect(ctx, x, y, badgeW, badgeH, 4);
+  ctx.fillStyle = c.bg;
+  ctx.fill();
+  ctx.strokeStyle = c.border;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x + 10, y + badgeH / 2, 3, 0, Math.PI * 2);
+  ctx.fillStyle = c.dot;
+  ctx.fill();
+
+  ctx.fillStyle = c.text;
+  ctx.fillText(c.label, x + 18, y + badgeH / 2 + 3.5);
+}
+
 /* ── main draw function ── */
 
-async function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult) {
+async function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult, opts: PosterOptions) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
   const W = 840;
   const H = 440;
   const DPR = window.devicePixelRatio ?? 1;
+  const scheme = COLOR_SCHEMES[opts.colorScheme];
 
   canvas.width = W * DPR;
   canvas.height = H * DPR;
@@ -137,17 +204,17 @@ async function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult) {
     ctx.stroke();
   }
 
-  /* Indigo glow behind team number */
+  /* Scheme glow behind team number */
   const glow = ctx.createRadialGradient(160, 110, 10, 160, 110, 220);
-  glow.addColorStop(0, "rgba(99,102,241,0.12)");
-  glow.addColorStop(1, "rgba(99,102,241,0)");
+  glow.addColorStop(0, scheme.glow);
+  glow.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, 380, 300);
 
   /* Left accent bar */
   const accentBar = ctx.createLinearGradient(0, 0, 0, H);
-  accentBar.addColorStop(0, "#6366f1");
-  accentBar.addColorStop(1, "#0ea5e9");
+  accentBar.addColorStop(0, scheme.a);
+  accentBar.addColorStop(1, scheme.b);
   ctx.fillStyle = accentBar;
   ctx.fillRect(0, 0, 5, H);
 
@@ -158,8 +225,9 @@ async function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult) {
   /* ── LEFT SECTION ── */
   const lx = 28;
 
+  /* Season tag */
   ctx.font = `500 9px system-ui, -apple-system, sans-serif`;
-  ctx.fillStyle = "rgba(129,140,248,0.72)";
+  ctx.fillStyle = scheme.a + "b8"; /* ~72% opacity hex */
   ctx.fillText(`FTC  ·  SEASON ${data.season}`, lx, 46);
 
   /* Faint watermark number */
@@ -177,74 +245,86 @@ async function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult) {
   ctx.fillStyle = numGrad;
   ctx.fillText(String(data.teamNumber), lx, 163);
 
-  /* Underline */
+  /* Underline — scheme colour */
   const ul = ctx.createLinearGradient(lx, 0, lx + 92, 0);
-  ul.addColorStop(0, "#6366f1");
-  ul.addColorStop(1, "rgba(99,102,241,0)");
+  ul.addColorStop(0, scheme.a);
+  ul.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = ul;
   ctx.fillRect(lx, 175, 92, 2);
 
-  /* Team name */
+  /* Team name (always shown) */
   const teamName = data.team?.name ?? `Team ${data.teamNumber}`;
   ctx.font = `600 20px system-ui, -apple-system, sans-serif`;
   ctx.fillStyle = "rgba(255,255,255,0.90)";
   ctx.fillText(fit(ctx, teamName, 348), lx, 210);
 
-  /* Organization */
-  if (data.team?.organization) {
+  /* Dynamic info block — tracks Y position */
+  let infoY = 232;
+
+  if (opts.showOrg && data.team?.organization) {
     ctx.font = `400 13px system-ui, -apple-system, sans-serif`;
     ctx.fillStyle = "rgba(255,255,255,0.50)";
-    ctx.fillText(fit(ctx, data.team.organization, 348), lx, 232);
+    ctx.fillText(fit(ctx, data.team.organization, 348), lx, infoY);
+    infoY += 22;
   }
 
-  /* Location */
-  if (data.team?.location) {
+  if (opts.showLocation && data.team?.location) {
     ctx.font = `400 12px system-ui, -apple-system, sans-serif`;
     ctx.fillStyle = "#a5b4fc";
-    ctx.fillText(data.team.location, lx, 252);
+    ctx.fillText(data.team.location, lx, infoY);
+    infoY += 20;
   }
 
-  /* Rookie year */
-  if (data.team?.rookieYear) {
+  if (opts.showRookieYear && data.team?.rookieYear) {
     ctx.font = `400 11px system-ui, -apple-system, sans-serif`;
     ctx.fillStyle = "rgba(255,255,255,0.28)";
-    ctx.fillText(`Est. ${data.team.rookieYear}`, lx, 272);
+    ctx.fillText(`Est. ${data.team.rookieYear}`, lx, infoY);
+    infoY += 18;
   }
 
+  /* ── Bottom-left dynamic block ── */
+  let dy = Math.max(infoY + 10, 286);
+
   /* QR code */
-  try {
-    const qrCanvas = document.createElement("canvas");
-    await QRCode.toCanvas(qrCanvas, `https://depthftc.vercel.app/teams?q=${data.teamNumber}`, {
-      width: 72,
-      margin: 1,
-      color: { dark: "#ffffff", light: "#111111" },
-    });
-    rrect(ctx, lx - 3, 283, 78, 78, 6);
-    ctx.fillStyle = "#111111";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.09)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.drawImage(qrCanvas, lx, 286);
-  } catch {
-    /* QR generation failed — skip silently */
+  if (opts.showQR) {
+    try {
+      const qrCanvas = document.createElement("canvas");
+      await QRCode.toCanvas(qrCanvas, `https://depthftc.vercel.app/teams?q=${data.teamNumber}`, {
+        width: 72,
+        margin: 1,
+        color: { dark: "#ffffff", light: "#111111" },
+      });
+      rrect(ctx, lx - 3, dy - 3, 78, 78, 6);
+      ctx.fillStyle = "#111111";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.09)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.drawImage(qrCanvas, lx, dy);
+      dy += 84;
+    } catch {
+      /* skip */
+    }
+  }
+
+  /* Team side badge */
+  if (opts.teamSide !== "none") {
+    drawSideBadge(ctx, lx, dy, opts.teamSide);
+    dy += 30;
   }
 
   /* Record summary */
-  if (data.events.length > 0) {
+  if (opts.showRecord && data.events.length > 0) {
+    const recY = Math.min(Math.max(dy + 8, 388), 410);
     const eventsWithRecord = data.events.filter((e) => e.record !== null);
-    const wins = eventsWithRecord.reduce(
-      (s, e) => s + (parseInt(e.record!.split("-")[0], 10) || 0), 0,
-    );
-    const losses = eventsWithRecord.reduce(
-      (s, e) => s + (parseInt(e.record!.split("-")[1], 10) || 0), 0,
-    );
+    const wins = eventsWithRecord.reduce((s, e) => s + (parseInt(e.record!.split("-")[0], 10) || 0), 0);
+    const losses = eventsWithRecord.reduce((s, e) => s + (parseInt(e.record!.split("-")[1], 10) || 0), 0);
     const recordStr = eventsWithRecord.length > 0 ? `  ·  ${wins}W – ${losses}L` : "";
     ctx.font = `500 11px system-ui, -apple-system, sans-serif`;
     ctx.fillStyle = "rgba(255,255,255,0.32)";
     ctx.fillText(
       `${data.events.length} event${data.events.length !== 1 ? "s" : ""}${recordStr}`,
-      lx, 395,
+      lx, recY,
     );
   }
 
@@ -252,103 +332,103 @@ async function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult) {
   const rx = 426;
   const rw = W - rx - 18;
 
-  ctx.font = `500 9px system-ui, -apple-system, sans-serif`;
-  ctx.fillStyle = "rgba(255,255,255,0.28)";
-  ctx.fillText("QUICK STATS", rx, 46);
+  if (opts.showStats) {
+    ctx.font = `500 9px system-ui, -apple-system, sans-serif`;
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.fillText("QUICK STATS", rx, 46);
 
-  if (!data.quickStats) {
-    ctx.font = `400 13px system-ui, -apple-system, sans-serif`;
-    ctx.fillStyle = "rgba(255,255,255,0.32)";
-    ctx.fillText("No stats available this season.", rx, 90);
-  } else {
-    const qs = data.quickStats;
+    if (!data.quickStats) {
+      ctx.font = `400 13px system-ui, -apple-system, sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.32)";
+      ctx.fillText("No stats available this season.", rx, 90);
+    } else {
+      const qs = data.quickStats;
+      const topY = 58;
+      const topH = 120;
+      const topGap = 10;
+      const topW = Math.floor((rw - topGap) / 2);
 
-    const topY = 58;
-    const topH = 120;
-    const topGap = 10;
-    const topW = Math.floor((rw - topGap) / 2);
-
-    statCard(ctx, rx, topY, topW, topH, {
-      label: "TOTAL NP OPR",
-      labelColor: "rgba(248,250,252,0.70)",
-      value: qs.total.value !== null ? qs.total.value.toFixed(2) : "—",
-      sub: qs.total.rank !== null && qs.total.percentile !== null
-        ? `#${qs.total.rank}  ·  top ${(100 - qs.total.percentile).toFixed(1)}%`
-        : "",
-      barColor: "rgba(255,255,255,0.28)",
-      valuePx: 32,
-    });
-
-    statCard(ctx, rx + topW + topGap, topY, topW, topH, {
-      label: "SEASON RANK",
-      labelColor: "#c4b5fd",
-      value: qs.total.rank !== null ? `#${qs.total.rank}` : "—",
-      sub: qs.comparedAgainst ? `of ${qs.comparedAgainst} teams` : "",
-      barColor: "rgba(196,181,253,0.40)",
-      valuePx: 32,
-    });
-
-    const botY = topY + topH + 10;
-    const botH = 130;
-    const botGap = 10;
-    const botW = Math.floor((rw - 2 * botGap) / 3);
-
-    const botStats: Array<{ label: string; value: RankedValue; barColor: string; labelColor: string }> = [
-      { label: "AUTO",    value: qs.auto,    barColor: "rgba(125,211,252,0.36)", labelColor: "#7dd3fc" },
-      { label: "TELEOP",  value: qs.teleop,  barColor: "rgba(253,186,116,0.36)", labelColor: "#fdba74" },
-      { label: "ENDGAME", value: qs.endgame, barColor: "rgba(110,231,183,0.36)", labelColor: "#6ee7b7" },
-    ];
-
-    botStats.forEach((s, i) => {
-      statCard(ctx, rx + i * (botW + botGap), botY, botW, botH, {
-        label: s.label,
-        labelColor: s.labelColor,
-        value: s.value.value !== null ? s.value.value.toFixed(2) : "—",
-        sub: s.value.rank !== null ? `#${s.value.rank}` : "",
-        barColor: s.barColor,
-        valuePx: 26,
+      statCard(ctx, rx, topY, topW, topH, {
+        label: "TOTAL NP OPR",
+        labelColor: "rgba(248,250,252,0.70)",
+        value: qs.total.value !== null ? qs.total.value.toFixed(2) : "—",
+        sub: qs.total.rank !== null && qs.total.percentile !== null
+          ? `#${qs.total.rank}  ·  top ${(100 - qs.total.percentile).toFixed(1)}%`
+          : "",
+        barColor: "rgba(255,255,255,0.28)",
+        valuePx: 32,
       });
-    });
 
-    /* Top events by OPR */
-    const evY = botY + botH + 14;
-    const topEvents = [...data.events]
-      .filter((e) => e.npOpr !== null)
-      .sort((a, b) => (b.npOpr ?? 0) - (a.npOpr ?? 0))
-      .slice(0, 2);
-
-    if (topEvents.length > 0) {
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      ctx.fillRect(rx, evY, rw, 1);
-
-      ctx.font = `500 9px system-ui, -apple-system, sans-serif`;
-      ctx.fillStyle = "rgba(255,255,255,0.24)";
-      ctx.fillText("TOP EVENTS BY OPR", rx, evY + 16);
-
-      topEvents.forEach((e, i) => {
-        const ey = evY + 32 + i * 20;
-        ctx.font = `400 11px system-ui, -apple-system, sans-serif`;
-        ctx.fillStyle = "rgba(255,255,255,0.42)";
-        ctx.fillText(fit(ctx, e.eventName, 215), rx, ey);
-
-        if (e.record) {
-          ctx.fillStyle = "#a5b4fc";
-          ctx.fillText(e.record, rx + 224, ey);
-        }
-        if (e.rank) {
-          ctx.fillStyle = "rgba(255,255,255,0.26)";
-          ctx.fillText(`rank ${e.rank}`, rx + 270, ey);
-        }
+      statCard(ctx, rx + topW + topGap, topY, topW, topH, {
+        label: "SEASON RANK",
+        labelColor: "#c4b5fd",
+        value: qs.total.rank !== null ? `#${qs.total.rank}` : "—",
+        sub: qs.comparedAgainst ? `of ${qs.comparedAgainst} teams` : "",
+        barColor: "rgba(196,181,253,0.40)",
+        valuePx: 32,
       });
+
+      const botY = topY + topH + 10;
+      const botH = 130;
+      const botGap = 10;
+      const botW = Math.floor((rw - 2 * botGap) / 3);
+
+      const botStats: Array<{ label: string; value: RankedValue; barColor: string; labelColor: string }> = [
+        { label: "AUTO",    value: qs.auto,    barColor: "rgba(125,211,252,0.36)", labelColor: "#7dd3fc" },
+        { label: "TELEOP",  value: qs.teleop,  barColor: "rgba(253,186,116,0.36)", labelColor: "#fdba74" },
+        { label: "ENDGAME", value: qs.endgame, barColor: "rgba(110,231,183,0.36)", labelColor: "#6ee7b7" },
+      ];
+
+      botStats.forEach((s, i) => {
+        statCard(ctx, rx + i * (botW + botGap), botY, botW, botH, {
+          label: s.label,
+          labelColor: s.labelColor,
+          value: s.value.value !== null ? s.value.value.toFixed(2) : "—",
+          sub: s.value.rank !== null ? `#${s.value.rank}` : "",
+          barColor: s.barColor,
+          valuePx: 26,
+        });
+      });
+
+      /* Top events */
+      const evY = botY + botH + 14;
+      const topEvents = [...data.events]
+        .filter((e) => e.npOpr !== null)
+        .sort((a, b) => (b.npOpr ?? 0) - (a.npOpr ?? 0))
+        .slice(0, 2);
+
+      if (topEvents.length > 0) {
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.fillRect(rx, evY, rw, 1);
+
+        ctx.font = `500 9px system-ui, -apple-system, sans-serif`;
+        ctx.fillStyle = "rgba(255,255,255,0.24)";
+        ctx.fillText("TOP EVENTS BY OPR", rx, evY + 16);
+
+        topEvents.forEach((e, i) => {
+          const ey = evY + 32 + i * 20;
+          ctx.font = `400 11px system-ui, -apple-system, sans-serif`;
+          ctx.fillStyle = "rgba(255,255,255,0.42)";
+          ctx.fillText(fit(ctx, e.eventName, 215), rx, ey);
+          if (e.record) {
+            ctx.fillStyle = "#a5b4fc";
+            ctx.fillText(e.record, rx + 224, ey);
+          }
+          if (e.rank) {
+            ctx.fillStyle = "rgba(255,255,255,0.26)";
+            ctx.fillText(`rank ${e.rank}`, rx + 270, ey);
+          }
+        });
+      }
     }
   }
 
-  /* Bottom gradient bar */
+  /* Bottom gradient bar — scheme colours */
   const botBar = ctx.createLinearGradient(0, 0, W, 0);
-  botBar.addColorStop(0, "rgba(99,102,241,0)");
-  botBar.addColorStop(0.25, "rgba(99,102,241,0.75)");
-  botBar.addColorStop(0.65, "rgba(14,165,233,0.75)");
-  botBar.addColorStop(1, "rgba(14,165,233,0)");
+  botBar.addColorStop(0, "rgba(0,0,0,0)");
+  botBar.addColorStop(0.25, scheme.a + "bf"); /* ~75% opacity */
+  botBar.addColorStop(0.65, scheme.b + "bf");
+  botBar.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = botBar;
   ctx.fillRect(0, H - 3, W, 3);
 
@@ -362,15 +442,34 @@ async function drawPoster(canvas: HTMLCanvasElement, data: TeamPageResult) {
 
 /* ── React component ── */
 
+const SCHEME_KEYS = Object.keys(COLOR_SCHEMES) as ColorScheme[];
+
+const SIDE_OPTIONS: { value: TeamSide; label: string }[] = [
+  { value: "none",   label: "None"       },
+  { value: "far",    label: "Far Side"   },
+  { value: "close",  label: "Close Side" },
+  { value: "hybrid", label: "Hybrid"     },
+];
+
+const INFO_TOGGLES: { key: keyof PosterOptions; label: string }[] = [
+  { key: "showOrg",        label: "Org"      },
+  { key: "showLocation",   label: "Location" },
+  { key: "showRookieYear", label: "Est. Year" },
+  { key: "showQR",         label: "QR Code"  },
+  { key: "showStats",      label: "Stats"    },
+  { key: "showRecord",     label: "Record"   },
+];
+
 export function PosterButton({ data }: { data: TeamPageResult }) {
   const [open, setOpen] = useState(false);
+  const [opts, setOpts] = useState<PosterOptions>(DEFAULT_OPTS);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (open && canvasRef.current) {
-      void drawPoster(canvasRef.current, data);
+      void drawPoster(canvasRef.current, data, opts);
     }
-  }, [open, data]);
+  }, [open, data, opts]);
 
   function handleDownload() {
     const canvas = canvasRef.current;
@@ -384,6 +483,10 @@ export function PosterButton({ data }: { data: TeamPageResult }) {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1500);
     }, "image/png");
+  }
+
+  function setOpt<K extends keyof PosterOptions>(key: K, value: PosterOptions[K]) {
+    setOpts((prev) => ({ ...prev, [key]: value }));
   }
 
   return (
@@ -401,10 +504,12 @@ export function PosterButton({ data }: { data: TeamPageResult }) {
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/85 p-4 backdrop-blur-sm"
           onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
         >
-          <div className="flex w-full max-w-3xl flex-col gap-4 rounded-[14px] border border-white/10 bg-[#0a0a0a] p-5">
+          <div className="flex w-full max-w-3xl flex-col gap-3 rounded-[14px] border border-white/10 bg-[#0a0a0a] p-5">
+
+            {/* Header */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-white/80">Team Card</span>
               <button
@@ -418,6 +523,7 @@ export function PosterButton({ data }: { data: TeamPageResult }) {
               </button>
             </div>
 
+            {/* Canvas preview */}
             <div className="overflow-hidden rounded-[10px]">
               <canvas
                 ref={canvasRef}
@@ -426,6 +532,72 @@ export function PosterButton({ data }: { data: TeamPageResult }) {
               />
             </div>
 
+            {/* Options panel */}
+            <div className="space-y-4 rounded-[10px] border border-white/8 bg-[#0d0d0d] p-4">
+
+              {/* Color scheme */}
+              <div className="flex items-center gap-4">
+                <span className="w-16 shrink-0 text-[10px] uppercase tracking-[0.12em] text-white/36">Color</span>
+                <div className="flex gap-2">
+                  {SCHEME_KEYS.map((scheme) => {
+                    const s = COLOR_SCHEMES[scheme];
+                    const active = opts.colorScheme === scheme;
+                    return (
+                      <button
+                        key={scheme}
+                        onClick={() => setOpt("colorScheme", scheme)}
+                        title={scheme}
+                        className={`h-6 w-6 rounded-full transition-all ${active ? "scale-110 ring-2 ring-white ring-offset-1 ring-offset-[#0d0d0d]" : "opacity-60 hover:opacity-90"}`}
+                        style={{ background: `linear-gradient(135deg, ${s.a}, ${s.b})` }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Team side */}
+              <div className="flex items-center gap-4">
+                <span className="w-16 shrink-0 text-[10px] uppercase tracking-[0.12em] text-white/36">Side</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {SIDE_OPTIONS.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      onClick={() => setOpt("teamSide", value)}
+                      className={`rounded-[6px] px-2.5 py-1 text-xs transition-colors ${
+                        opts.teamSide === value
+                          ? "bg-white/12 text-white"
+                          : "text-white/40 hover:bg-white/6 hover:text-white/60"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Show/hide toggles */}
+              <div className="flex items-center gap-4">
+                <span className="w-16 shrink-0 text-[10px] uppercase tracking-[0.12em] text-white/36">Show</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {INFO_TOGGLES.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setOpt(key, !opts[key] as PosterOptions[typeof key])}
+                      className={`rounded-[6px] px-2.5 py-1 text-xs transition-colors ${
+                        opts[key]
+                          ? "bg-white/12 text-white"
+                          : "text-white/36 hover:bg-white/6 hover:text-white/50"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Actions */}
             <div className="flex gap-3">
               <button
                 onClick={handleDownload}
@@ -449,6 +621,7 @@ export function PosterButton({ data }: { data: TeamPageResult }) {
                 Close
               </button>
             </div>
+
           </div>
         </div>
       )}
