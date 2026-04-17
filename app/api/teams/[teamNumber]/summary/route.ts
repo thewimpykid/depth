@@ -22,10 +22,14 @@ export async function GET(
     return NextResponse.json({ error: "Invalid team number" }, { status: 400 });
   }
 
-  const summary = await getTeamSummaryData(Number(teamNumber), season);
-  return NextResponse.json(summary, {
-    headers: {
-      "Cache-Control": "public, max-age=300, stale-while-revalidate=300",
-    },
-  });
+  try {
+    const summary = await getTeamSummaryData(Number(teamNumber), season);
+    return NextResponse.json(summary, {
+      headers: {
+        "Cache-Control": "public, max-age=300, stale-while-revalidate=300",
+      },
+    });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
 }

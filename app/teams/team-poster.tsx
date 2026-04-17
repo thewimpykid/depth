@@ -1,7 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { RankedValue, TeamPageResult } from "@/lib/ftc";
+
+type RankedValue = { value: number | null; rank: number | null; percentile: number | null };
+type TeamProfile = {
+  name: string | null;
+  organization: string | null;
+  location: string | null;
+  rookieYear: number | null;
+};
+type TeamEventSummary = {
+  eventName: string;
+  record: string | null;
+  rank: number | null;
+  npOpr: number | null;
+};
+type TeamQuickStats = {
+  total: RankedValue;
+  auto: RankedValue;
+  teleop: RankedValue;
+  endgame: RankedValue;
+  comparedAgainst: number | null;
+};
+type TeamPageResult = {
+  teamNumber: number;
+  season: number;
+  team: TeamProfile | null;
+  quickStats: TeamQuickStats | null;
+  events: TeamEventSummary[];
+};
 
 /* ── canvas helpers ── */
 

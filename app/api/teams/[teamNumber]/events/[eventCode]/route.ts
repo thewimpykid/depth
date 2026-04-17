@@ -22,15 +22,19 @@ export async function GET(
     return NextResponse.json({ error: "Invalid team number" }, { status: 400 });
   }
 
-  const details = await getTeamEventDetails(Number(teamNumber), eventCode, season);
+  try {
+    const details = await getTeamEventDetails(Number(teamNumber), eventCode, season);
 
-  if (!details) {
-    return NextResponse.json({ error: "Event not found for team" }, { status: 404 });
+    if (!details) {
+      return NextResponse.json({ error: "Event not found for team" }, { status: 404 });
+    }
+
+    return NextResponse.json(details, {
+      headers: {
+        "Cache-Control": "public, max-age=120, stale-while-revalidate=300",
+      },
+    });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
-
-  return NextResponse.json(details, {
-    headers: {
-      "Cache-Control": "public, max-age=120, stale-while-revalidate=300",
-    },
-  });
 }
