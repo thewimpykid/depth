@@ -104,7 +104,7 @@ type ConsistencyData = {
 function calcConsistency(events: TeamPageResult["events"]): ConsistencyData | null {
   const oprs = [...events]
     .reverse()
-    .map((e) => e.npOpr)
+    .map((e) => e.npOpr ?? e.npAverage)
     .filter((v): v is number => v !== null);
   if (oprs.length < 2) return null;
 
@@ -167,7 +167,18 @@ function OprSparkline({ oprs, color }: { oprs: number[]; color: string }) {
 
 function ConsistencySection({ events }: { events: TeamPageResult["events"] }) {
   const cs = calcConsistency(events);
-  if (!cs) return null;
+
+  if (!cs) {
+    if (events.length < 2) return null;
+    return (
+      <section className="mt-4 rounded-[12px] border border-white/10 bg-[#090909] p-5">
+        <div className="text-base font-medium text-white">Consistency</div>
+        <div className="mt-3 text-sm text-white/45">
+          No per-event OPR data yet — check back after events are scored.
+        </div>
+      </section>
+    );
+  }
 
   const tier = consistencyTier(cs.score);
   const trendIcon = cs.trend === "up" ? "↑" : cs.trend === "down" ? "↓" : "→";
