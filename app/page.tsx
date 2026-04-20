@@ -80,9 +80,9 @@ function formatHomeDate(date: Date) {
 }
 
 export default async function Home() {
+  const season = await ftcApiClient.getCurrentSeason();
   const today = new Date();
   const todayKey = toDateKey(today);
-  const season = await ftcApiClient.getCurrentSeason();
 
   const [seasonSummary, seasonEventsResponse, matchRecords, scatterTeams] = await Promise.all([
     ftcApiClient.getSeasonSummary().catch(() => ({ teamCount: null as number | null })),
