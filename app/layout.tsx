@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import { cacheLife } from "next/cache";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import SiteHeader from "./site-header";
@@ -34,6 +35,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  "use cache";
+  cacheLife("days");
   const { currentSeason } = await getCurrentSeasonWithOptions().catch(() => ({ currentSeason: 2024, seasonOptions: [] as number[] }));
 
   return (
