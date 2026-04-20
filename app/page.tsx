@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 
 import { ftcApiClient } from "@/lib/ftc-api-client";
 import { getSeasonRecords, type MatchSeasonRecordRow } from "@/lib/ftcscout-records-data";
@@ -80,6 +81,7 @@ function formatHomeDate(date: Date) {
 }
 
 export default async function Home() {
+  await connection();
   const season = await ftcApiClient.getCurrentSeason();
   const today = new Date();
   const todayKey = toDateKey(today);
