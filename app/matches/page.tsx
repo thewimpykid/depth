@@ -3,8 +3,6 @@ import { getCurrentSeasonWithOptions } from "@/lib/team-analysis";
 import { getSeasonEventByCode, searchSeasonEvents } from "@/lib/event-simulation";
 import { ftcApiClient } from "@/lib/ftc-api-client";
 
-export const dynamic = "force-dynamic";
-
 function isSeason(value: string) {
   return /^\d{4}$/.test(value);
 }

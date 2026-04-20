@@ -4,8 +4,6 @@ import EventSearchForm from "../event-search-form";
 import { getCurrentSeasonWithOptions } from "@/lib/team-analysis";
 import { searchSeasonEvents } from "@/lib/event-simulation";
 
-export const dynamic = "force-dynamic";
-
 function isSeason(value: string) {
   return /^\d{4}$/.test(value);
 }

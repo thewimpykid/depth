@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cacheLife } from "next/cache";
 import { cacheManager } from "@/lib/cache-manager";
 import type { ScatterTeam } from "@/app/opr-scatter";
 
@@ -147,6 +148,8 @@ async function fetchTopTeamsByOpr(
 }
 
 export async function getScatterTeams(season: number, target: number): Promise<ScatterTeam[]> {
+  "use cache";
+  cacheLife("hours");
   // Cache key version suffix forces a fresh fetch when logic changes.
   const cacheKey = `scatter-v3-${season}-${target}`;
   const cached = await cacheManager.get<ScatterTeam[]>("scatter", cacheKey);

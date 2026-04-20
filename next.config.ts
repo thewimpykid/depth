@@ -6,6 +6,7 @@ const configFilename = fileURLToPath(import.meta.url);
 const configDir = path.dirname(configFilename);
 
 const nextConfig: NextConfig = {
+  cacheComponents: true,
   turbopack: {
     root: configDir,
   },

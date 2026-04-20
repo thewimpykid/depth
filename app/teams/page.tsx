@@ -1,8 +1,6 @@
 import TeamLookupForm from "../team-lookup";
 import TeamSummary from "./team-summary";
 
-export const dynamic = "force-dynamic";
-
 function isValidTeamNumber(value: string) {
   return /^\d{1,5}$/.test(value);
 }

@@ -11,8 +11,6 @@ import {
   type TeamSeasonRecordRow,
 } from "@/lib/ftcscout-records-data";
 
-export const dynamic = "force-dynamic";
-
 type EventMeta = {
   regionCode: string | null;
   typeName: string | null;

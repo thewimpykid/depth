@@ -6,8 +6,6 @@ import { getScatterTeams } from "@/lib/scatter-data";
 import OprScatter from "./opr-scatter";
 import TeamLookupForm from "./team-lookup";
 
-export const dynamic = "force-dynamic";
-
 type ParsedEvent = {
   code: string;
   name: string;

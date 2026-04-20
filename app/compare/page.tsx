@@ -8,8 +8,6 @@ import {
   type TeamSnapshot,
 } from "@/lib/team-analysis";
 
-export const dynamic = "force-dynamic";
-
 type MetricKey = "total" | "auto" | "teleop" | "endgame";
 
 const METRICS: Array<{ key: MetricKey; label: string }> = [

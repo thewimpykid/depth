@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cacheLife } from "next/cache";
 import { cacheManager, CACHE_TTL } from "@/lib/cache-manager";
 
 const FTCSCOUT_WEB_BASE =
@@ -282,6 +283,8 @@ async function fetchOnePage(
 }
 
 export async function getSeasonRecords(season: number, view: SeasonRecordsView) {
+  "use cache";
+  cacheLife("minutes");
   const cacheKey = `v2:${season}:${view}`;
   const cached = await cacheManager.get<SeasonRecordsDataset>("ftcscout-records", cacheKey);
   if (cached) return cached;

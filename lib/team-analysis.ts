@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cacheLife } from "next/cache";
 import { cacheManager, CACHE_TTL } from "@/lib/cache-manager";
 import { ftcApiClient } from "@/lib/ftc-api-client";
 import { ftcScoutApiClient } from "@/lib/ftcscout-api-client";
@@ -593,6 +594,8 @@ export function parseTeamNumbersInput(raw: string, limit = 12) {
 }
 
 export async function getCurrentSeasonWithOptions() {
+  "use cache";
+  cacheLife("days");
   const currentSeason = await ftcApiClient.getCurrentSeason();
   return {
     currentSeason,

@@ -10,8 +10,6 @@ import {
   searchSeasonEvents,
 } from "@/lib/event-simulation";
 
-export const dynamic = "force-dynamic";
-
 function isSeason(value: string) {
   return /^\d{4}$/.test(value);
 }
