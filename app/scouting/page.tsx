@@ -7,7 +7,7 @@ import { searchSeasonEvents, getSeasonEventByCode } from "@/lib/event-simulation
 import { ftcApiClient } from "@/lib/ftc-api-client";
 import { getScoutReports } from "@/lib/scout-db";
 
-const PROD_BASE = "https://depth.vercel.app";
+const PROD_BASE = "https://depthftc.vercel.app";
 
 function isSeason(value: string) {
   return /^\d{4}$/.test(value);
