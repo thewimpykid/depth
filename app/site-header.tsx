@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { href: "/teams", label: "teams" },
   { href: "/compare", label: "compare" },
   { href: "/simulate", label: "simulate" },
-  { href: "/scouting", label: "scout" },
+  { href: "/scouting", label: "scout", accent: true },
   { href: "/methodology", label: "methodology" },
 ];
 
@@ -65,7 +65,9 @@ export default function SiteHeader({ season }: { season: number }) {
                     "rounded-[8px] border px-3 py-2 transition-colors",
                     active
                       ? "border-white/18 bg-white text-black font-semibold"
-                      : "border-transparent text-white/52 hover:text-white/80",
+                      : item.accent
+                        ? "border-[#8be800]/30 text-[#8be800]/70 hover:border-[#8be800]/50 hover:text-[#8be800]"
+                        : "border-transparent text-white/52 hover:text-white/80",
                   ].join(" ")}
                 >
                   {item.label}
@@ -133,7 +135,7 @@ export default function SiteHeader({ season }: { season: number }) {
                     key={item.href}
                     href={item.href}
                     onClick={() => setMenuOpen(false)}
-                    className={["rounded-[8px] border px-4 py-3 transition-colors", active ? "border-white/18 bg-white text-black font-semibold" : "border-transparent text-white/52 hover:text-white/80"].join(" ")}
+                    className={["rounded-[8px] border px-4 py-3 transition-colors", active ? "border-white/18 bg-white text-black font-semibold" : item.accent ? "border-[#8be800]/30 text-[#8be800]/70 hover:border-[#8be800]/50 hover:text-[#8be800]" : "border-transparent text-white/52 hover:text-white/80"].join(" ")}
                   >
                     {item.label}
                   </Link>
