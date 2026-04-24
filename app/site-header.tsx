@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/teams", label: "teams" },
   { href: "/compare", label: "compare" },
   { href: "/simulate", label: "simulate" },
+  { href: "/scouting", label: "scout" },
   { href: "/methodology", label: "methodology" },
 ];
 
