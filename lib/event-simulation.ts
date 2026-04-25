@@ -776,25 +776,8 @@ export async function simulateActualEvent(
   const playedMatches = matches.filter((match) => match.status === "played");
   const remainingMatches = matches.filter((match) => match.status === "upcoming");
 
-  const lockedStandings = createWorkingStandings(teams);
-  for (const match of playedMatches) {
-    applyResult(
-      lockedStandings,
-      match.redAlliance,
-      match.actualRedScore ?? 0,
-      match.actualBlueScore ?? 0,
-    );
-    applyResult(
-      lockedStandings,
-      match.blueAlliance,
-      match.actualBlueScore ?? 0,
-      match.actualRedScore ?? 0,
-    );
-  }
-
   const summaries = new Map<number, ActualEventStanding>();
   for (const team of teams) {
-    const locked = lockedStandings.get(team.teamNumber);
     summaries.set(team.teamNumber, {
       teamNumber: team.teamNumber,
       name: team.name,
@@ -806,9 +789,9 @@ export async function simulateActualEvent(
       firstSeedProbability: 0,
       topFourProbability: 0,
       averageScoreFor: 0,
-      lockedWins: locked?.wins ?? 0,
-      lockedLosses: locked?.losses ?? 0,
-      lockedTies: locked?.ties ?? 0,
+      lockedWins: 0,
+      lockedLosses: 0,
+      lockedTies: 0,
       championProbability: 0,
       finalistProbability: 0,
       semifinalistProbability: 0,
@@ -823,17 +806,7 @@ export async function simulateActualEvent(
     const scoreStdDev = Math.max(8, fallbackStrength * 0.16);
     const runStandings = createWorkingStandings(teams);
 
-    for (const [teamNumber, locked] of lockedStandings.entries()) {
-      const row = runStandings.get(teamNumber);
-      if (!row) continue;
-      row.wins = locked.wins;
-      row.losses = locked.losses;
-      row.ties = locked.ties;
-      row.scoreFor = locked.scoreFor;
-      row.tbp = locked.tbp;
-    }
-
-    for (const match of remainingMatches) {
+    for (const match of matches) {
       const sampledRedScore = Math.max(0, gaussian(match.predictedRedScore, scoreStdDev));
       const sampledBlueScore = Math.max(0, gaussian(match.predictedBlueScore, scoreStdDev));
       const roundedRed = round(sampledRedScore);
