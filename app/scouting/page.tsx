@@ -6,6 +6,8 @@ import { getCurrentSeasonWithOptions } from "@/lib/team-analysis";
 import { searchSeasonEvents, getSeasonEventByCode } from "@/lib/event-simulation";
 import { ftcApiClient } from "@/lib/ftc-api-client";
 import { getReportsForTeams } from "@/lib/scout-db";
+import { getEventOprMap } from "@/lib/ftc";
+import type { OprBreakdown } from "@/lib/ftc";
 
 const PROD_BASE = "https://depthftc.vercel.app";
 
@@ -154,11 +156,12 @@ export default async function ScoutingPage(props: {
   let event = null;
   let teams: { teamNumber: number; name: string | null }[] = [];
   let reports: Awaited<ReturnType<typeof getReportsForTeams>> = [];
+  let oprMap: Record<number, OprBreakdown> = {};
   let qrDataUrl = "";
   let qrUrl = "";
 
   if (eventCode) {
-    const [eventResult, teamsResult] = await Promise.all([
+    const [eventResult, teamsResult, fetchedOprMap] = await Promise.all([
       getSeasonEventByCode(season, eventCode),
       ftcApiClient.getEventTeams(eventCode, season).catch(() => ({
         teams: [],
@@ -166,9 +169,11 @@ export default async function ScoutingPage(props: {
         pageCurrent: 1,
         pageTotal: 1,
       })),
+      getEventOprMap(eventCode, season),
     ]);
 
     event = eventResult;
+    oprMap = fetchedOprMap;
 
     teams = (teamsResult.teams ?? [])
       .flatMap((raw) => {
@@ -237,6 +242,7 @@ export default async function ScoutingPage(props: {
               qrDataUrl={qrDataUrl}
               qrUrl={qrUrl}
               eventName={event.name}
+              oprMap={oprMap}
             />
           )
         ) : null}

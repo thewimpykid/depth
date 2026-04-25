@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ScoutReport } from "@/lib/scout-db";
+import type { OprBreakdown } from "@/lib/ftc";
 
 type Team = { teamNumber: number; name: string | null };
 
@@ -546,11 +547,33 @@ function exportCsv(teams: Team[], reports: ScoutReport[], eventCode: string) {
 
 /* ──────────────────── Main export ──────────────────── */
 
+function OprChips({ opr }: { opr: OprBreakdown }) {
+  const fmt = (v: number | null) => (v == null ? null : v.toFixed(1));
+  const chips = [
+    { label: "NP", value: fmt(opr.total), color: "text-white/70" },
+    { label: "Auto", value: fmt(opr.auto), color: "text-indigo-300/70" },
+    { label: "DC", value: fmt(opr.teleop), color: "text-indigo-300/60" },
+    { label: "EG", value: fmt(opr.endgame), color: "text-indigo-300/50" },
+  ].filter((c) => c.value != null);
+  if (chips.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-1">
+      {chips.map((c) => (
+        <span key={c.label} className="flex items-center gap-1 text-[10px] tabular-nums">
+          <span className="text-white/22 uppercase tracking-[0.08em]">{c.label}</span>
+          <span className={c.color}>{c.value}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function ScoutingTeamList({
-  teams, initialReports, eventCode, season, qrDataUrl, eventName, qrUrl,
+  teams, initialReports, eventCode, season, qrDataUrl, eventName, qrUrl, oprMap = {},
 }: {
   teams: Team[]; initialReports: ScoutReport[]; eventCode: string;
   season: number; qrDataUrl: string; eventName: string; qrUrl: string;
+  oprMap?: Record<number, OprBreakdown>;
 }) {
   const [reports, setReports] = useState<ScoutReport[]>(initialReports);
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
@@ -683,9 +706,12 @@ export default function ScoutingTeamList({
                     className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3"
                     onClick={() => setExpandedTeam(isExpanded ? null : team.teamNumber)}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="shrink-0 text-sm font-semibold tabular-nums text-white">{team.teamNumber}</span>
-                      {team.name ? <span className="truncate text-sm text-white/40">{team.name}</span> : null}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2.5">
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-white">{team.teamNumber}</span>
+                        {team.name ? <span className="truncate text-sm text-white/40">{team.name}</span> : null}
+                      </div>
+                      {oprMap[team.teamNumber] ? <OprChips opr={oprMap[team.teamNumber]} /> : null}
                     </div>
                     <span className="shrink-0 text-[10px] uppercase tracking-[0.1em] text-white/22 hover:text-white/50">
                       {isExpanded ? "Close" : "Edit"}
@@ -723,9 +749,12 @@ export default function ScoutingTeamList({
                   className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3"
                   onClick={() => setExpandedTeam(expandedTeam === team.teamNumber ? null : team.teamNumber)}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="shrink-0 text-sm font-semibold tabular-nums text-white">{team.teamNumber}</span>
-                    {team.name ? <span className="truncate text-sm text-white/40">{team.name}</span> : null}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2.5">
+                      <span className="shrink-0 text-sm font-semibold tabular-nums text-white">{team.teamNumber}</span>
+                      {team.name ? <span className="truncate text-sm text-white/40">{team.name}</span> : null}
+                    </div>
+                    {oprMap[team.teamNumber] ? <OprChips opr={oprMap[team.teamNumber]} /> : null}
                   </div>
                   <span className={["shrink-0 text-[10px] uppercase tracking-[0.1em]", expandedTeam === team.teamNumber ? "text-white/24" : "text-white/44"].join(" ")}>
                     {expandedTeam === team.teamNumber ? "Cancel" : "+ Add"}

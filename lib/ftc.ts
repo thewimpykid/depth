@@ -1203,3 +1203,36 @@ export async function getTeamEventDetails(
     scheduleStrength,
   };
 }
+
+export async function getEventOprMap(
+  eventCode: string,
+  season?: number,
+): Promise<Record<number, OprBreakdown>> {
+  try {
+    const [hybridSchedule, scoreDetails] = await Promise.all([
+      ftcApiClient
+        .getHybridSchedule(eventCode, "qual", { season })
+        .catch(() => ({ schedule: [] })),
+      ftcApiClient
+        .getScoreDetails(eventCode, "qual", { season })
+        .catch(() => ({ matchScores: [] })),
+    ]);
+
+    const scoreIndex = createScoreDetailIndex(asArray(scoreDetails.matchScores));
+    const playedMatches = asArray(hybridSchedule.schedule)
+      .map((row) => parsePlayedQualificationMatch(row, scoreIndex))
+      .filter((m): m is PlayedQualMatch => m !== null);
+
+    if (playedMatches.length === 0) return {};
+
+    const bundle = computeOprBundle(playedMatches);
+    const result: Record<number, OprBreakdown> = {};
+    for (const teamNumber of bundle.total.keys()) {
+      const breakdown = mapToBreakdown(bundle, teamNumber);
+      if (breakdown) result[teamNumber] = breakdown;
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
