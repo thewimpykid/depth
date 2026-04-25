@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertScoutReport } from "@/lib/scout-db";
+import { upsertScoutReport, getTeamScoutReports } from "@/lib/scout-db";
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const teamNumber = Number(searchParams.get("teamNumber"));
+  const season = Number(searchParams.get("season"));
+
+  if (!teamNumber || !season) {
+    return NextResponse.json({ error: "teamNumber and season required" }, { status: 400 });
+  }
+
+  const reports = await getTeamScoutReports(season, teamNumber);
+  return NextResponse.json(reports, {
+    headers: { "Cache-Control": "no-store" },
+  });
+}
 
 export async function POST(req: NextRequest) {
   let body: unknown;

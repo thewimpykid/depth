@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import TeamEvents from "./team-events";
 import { PosterButton } from "./team-poster";
 import type { RankedValue, TeamPageResult } from "@/lib/ftc";
+import type { ScoutReport } from "@/lib/scout-db";
 
 const summaryCache = new Map<string, TeamPageResult>();
 const TEAM_SUMMARY_SCHEMA_VERSION = "2";
@@ -141,6 +142,7 @@ export default function TeamSummary({
   const cacheKey = `${TEAM_SUMMARY_SCHEMA_VERSION}:${teamNumber}:${requestedSeason ?? "current"}`;
   const [data, setData] = useState<TeamPageResult | null>(() => summaryCache.get(cacheKey) ?? null);
   const [error, setError] = useState<string | null>(null);
+  const [scoutReports, setScoutReports] = useState<Record<string, ScoutReport>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -185,6 +187,24 @@ export default function TeamSummary({
       cancelled = true;
     };
   }, [cacheKey, requestedSeason, teamNumber]);
+
+  useEffect(() => {
+    if (!data) return;
+    let cancelled = false;
+    fetch(`/api/scout?teamNumber=${data.teamNumber}&season=${data.season}`)
+      .then((r) => (r.ok ? (r.json() as Promise<ScoutReport[]>) : Promise.resolve([])))
+      .then((reports) => {
+        if (!cancelled) {
+          const map: Record<string, ScoutReport> = {};
+          for (const r of reports) map[r.event_code] = r;
+          setScoutReports(map);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.teamNumber, data?.season]);
 
   if (error) {
     return (
@@ -255,7 +275,7 @@ export default function TeamSummary({
 
       <QuickStatsTable data={data.quickStats ?? null} />
 
-      <TeamEvents teamNumber={data.teamNumber} season={data.season} events={data.events} />
+      <TeamEvents teamNumber={data.teamNumber} season={data.season} events={data.events} scoutReports={scoutReports} />
     </>
   );
 }

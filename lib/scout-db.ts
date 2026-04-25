@@ -68,6 +68,27 @@ export async function getScoutReports(
   }
 }
 
+export async function getTeamScoutReports(
+  season: number,
+  teamNumber: number,
+): Promise<ScoutReport[]> {
+  try {
+    const client = getClient();
+    if (!client) return [];
+
+    const { data, error } = await client
+      .from("scout_reports")
+      .select("*")
+      .eq("season", season)
+      .eq("team_number", teamNumber);
+
+    if (error || !data) return [];
+    return data as ScoutReport[];
+  } catch {
+    return [];
+  }
+}
+
 export async function upsertScoutReport(
   report: Omit<ScoutReport, "id" | "submitted_at">,
 ): Promise<{ error: string | null }> {
