@@ -68,6 +68,36 @@ export async function getScoutReports(
   }
 }
 
+export async function getReportsForTeams(
+  season: number,
+  teamNumbers: number[],
+): Promise<ScoutReport[]> {
+  if (teamNumbers.length === 0) return [];
+  try {
+    const client = getClient();
+    if (!client) return [];
+
+    const { data, error } = await client
+      .from("scout_reports")
+      .select("*")
+      .eq("season", season)
+      .in("team_number", teamNumbers)
+      .order("submitted_at", { ascending: false });
+
+    if (error || !data) return [];
+
+    // keep most recent report per team
+    const seen = new Set<number>();
+    return (data as ScoutReport[]).filter((r) => {
+      if (seen.has(r.team_number)) return false;
+      seen.add(r.team_number);
+      return true;
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function getTeamScoutReports(
   season: number,
   teamNumber: number,

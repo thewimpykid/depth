@@ -11,7 +11,6 @@ import type {
   TeamEventSummary,
   TeamMatch,
 } from "@/lib/ftc";
-import type { ScoutReport } from "@/lib/scout-db";
 
 const EVENT_DETAILS_SCHEMA_VERSION = "8";
 const eventDetailsCache = new Map<string, TeamEventDetails>();
@@ -439,102 +438,6 @@ function LoadingMatches() {
   );
 }
 
-function ScoutStars({ value, color }: { value: number; color: string }) {
-  return (
-    <span className="inline-flex gap-px">
-      {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} className={i < value ? color : "text-white/15"}>★</span>
-      ))}
-    </span>
-  );
-}
-
-function ScoutReportBadge({ report }: { report: ScoutReport }) {
-  const caps = [
-    report.close_side && "Close",
-    report.far_side && "Far",
-    report.auto_close && "Auto Close",
-    report.auto_far && "Auto Far",
-    report.full_park && "Full Park",
-    report.lift && "Lift",
-  ].filter((v): v is string => Boolean(v));
-
-  const hasTeleopRange =
-    (report.close_side && (report.artifacts_teleop_close > 0 || report.artifacts_teleop_close_max > 0)) ||
-    (report.far_side && (report.artifacts_teleop_far > 0 || report.artifacts_teleop_far_max > 0));
-
-  const hasAutoArtifacts =
-    (report.auto_close && report.artifacts_auto_close > 0) ||
-    (report.auto_far && report.artifacts_auto_far > 0);
-
-  const hasRatings = report.scoring_ability > 0 || report.defense_rating > 0 || report.close_rating > 0 || report.far_rating > 0;
-
-  return (
-    <div className="mt-3 rounded-[10px] border border-[#8be800]/15 bg-[#0a1400] p-3">
-      <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-[#8be800]/60">Scout Report · Self-Reported</div>
-
-      {caps.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {caps.map((c) => (
-            <span key={c} className="rounded-[6px] border border-white/10 bg-white/6 px-2 py-0.5 text-xs text-white/65">{c}</span>
-          ))}
-          {report.preferred_side ? (
-            <span className="rounded-[6px] border border-indigo-400/20 bg-indigo-400/8 px-2 py-0.5 text-xs text-indigo-300/70">
-              Prefers {report.preferred_side}
-            </span>
-          ) : null}
-        </div>
-      )}
-
-      {hasAutoArtifacts && (
-        <div className="mb-1 text-xs text-white/48">
-          Auto:{" "}
-          {report.auto_close && report.artifacts_auto_close > 0 ? `Close ×${report.artifacts_auto_close}` : null}
-          {report.auto_close && report.artifacts_auto_close > 0 && report.auto_far && report.artifacts_auto_far > 0 ? ", " : null}
-          {report.auto_far && report.artifacts_auto_far > 0 ? `Far ×${report.artifacts_auto_far}` : null}
-        </div>
-      )}
-
-      {hasTeleopRange && (
-        <div className="mb-1 text-xs text-white/48">
-          Teleop:{" "}
-          {report.close_side && (report.artifacts_teleop_close > 0 || report.artifacts_teleop_close_max > 0)
-            ? `Close ${report.artifacts_teleop_close}–${report.artifacts_teleop_close_max}`
-            : null}
-          {report.close_side && report.far_side ? ", " : null}
-          {report.far_side && (report.artifacts_teleop_far > 0 || report.artifacts_teleop_far_max > 0)
-            ? `Far ${report.artifacts_teleop_far}–${report.artifacts_teleop_far_max}`
-            : null}
-        </div>
-      )}
-
-      {hasRatings && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/50 mb-1">
-          {report.scoring_ability > 0 && (
-            <span className="flex items-center gap-1">Scoring <ScoutStars value={report.scoring_ability} color="text-yellow-400" /></span>
-          )}
-          {report.defense_rating > 0 && (
-            <span className="flex items-center gap-1">Defense <ScoutStars value={report.defense_rating} color="text-red-400" /></span>
-          )}
-          {report.close_rating > 0 && (
-            <span className="flex items-center gap-1">Close <ScoutStars value={report.close_rating} color="text-blue-400" /></span>
-          )}
-          {report.far_rating > 0 && (
-            <span className="flex items-center gap-1">Far <ScoutStars value={report.far_rating} color="text-purple-400" /></span>
-          )}
-          {report.estimated_solo_points > 0 && (
-            <span>Est. {report.estimated_solo_points} pts</span>
-          )}
-        </div>
-      )}
-
-      {report.notes && (
-        <div className="mt-1 text-xs text-white/40 italic">&ldquo;{report.notes}&rdquo;</div>
-      )}
-    </div>
-  );
-}
-
 type EventState = {
   loading: boolean;
   data: TeamEventDetails | null;
@@ -545,12 +448,10 @@ export default function TeamEvents({
   teamNumber,
   season,
   events,
-  scoutReports = {},
 }: {
   teamNumber: number;
   season: number;
   events: TeamEventSummary[];
-  scoutReports?: Record<string, ScoutReport>;
 }) {
   const initialState = new Map<string, EventState>();
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -717,9 +618,6 @@ export default function TeamEvents({
             </div>
 
             <EventStatsRow event={event} />
-            {scoutReports[event.eventCode] ? (
-              <ScoutReportBadge report={scoutReports[event.eventCode]} />
-            ) : null}
             <OprChips currentOpr={eventState?.data?.currentOpr ?? null} />
             <ScheduleStrengthBadge ss={eventState?.data?.scheduleStrength ?? null} />
 

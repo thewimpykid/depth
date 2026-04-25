@@ -5,7 +5,7 @@ import ScoutingTeamList from "./scouting-team-list";
 import { getCurrentSeasonWithOptions } from "@/lib/team-analysis";
 import { searchSeasonEvents, getSeasonEventByCode } from "@/lib/event-simulation";
 import { ftcApiClient } from "@/lib/ftc-api-client";
-import { getScoutReports } from "@/lib/scout-db";
+import { getReportsForTeams } from "@/lib/scout-db";
 
 const PROD_BASE = "https://depthftc.vercel.app";
 
@@ -158,7 +158,7 @@ export default async function ScoutingPage(props: {
   let qrUrl = "";
 
   if (eventCode) {
-    const [eventResult, teamsResult, reportsResult] = await Promise.all([
+    const [eventResult, teamsResult] = await Promise.all([
       getSeasonEventByCode(season, eventCode),
       ftcApiClient.getEventTeams(eventCode, season).catch(() => ({
         teams: [],
@@ -166,7 +166,6 @@ export default async function ScoutingPage(props: {
         pageCurrent: 1,
         pageTotal: 1,
       })),
-      getScoutReports(season, eventCode),
     ]);
 
     event = eventResult;
@@ -182,7 +181,7 @@ export default async function ScoutingPage(props: {
       })
       .sort((a, b) => a.teamNumber - b.teamNumber);
 
-    reports = reportsResult;
+    reports = await getReportsForTeams(season, teams.map((t) => t.teamNumber));
 
     qrUrl = `${PROD_BASE}/scouting?eventCode=${encodeURIComponent(eventCode)}&season=${season}`;
     qrDataUrl = await QRCode.toDataURL(qrUrl, {
