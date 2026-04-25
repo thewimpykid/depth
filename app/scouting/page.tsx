@@ -153,7 +153,7 @@ export default async function ScoutingPage(props: {
 
   let event = null;
   let teams: { teamNumber: number; name: string | null }[] = [];
-  let reports: Awaited<ReturnType<typeof getScoutReports>> = [];
+  let reports: Awaited<ReturnType<typeof getReportsForTeams>> = [];
   let qrDataUrl = "";
   let qrUrl = "";
 
